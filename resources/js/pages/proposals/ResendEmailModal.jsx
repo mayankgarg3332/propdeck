@@ -165,7 +165,7 @@ function buildResendHtml({ proposal, client, settings, rep }) {
   <div style="border-top:1px solid #f3f4f6;padding-top:18px;">
     <div style="font-weight:700;color:#111827;font-size:14px;">${signatory}</div>
     <div style="color:#6b7280;font-size:12px;margin-top:2px;">${company.designation || rep?.role || "Sales Rep"} · ${company.name || "Propdeck"}</div>
-    <div style="font-size:12px;color:#6b7280;margin-top:4px;">${[phone, rep?.email].filter(Boolean).join(" · ")}</div>
+    <div style="font-size:12px;color:#6b7280;margin-top:4px;">${[phone, company.email || rep?.email].filter(Boolean).join(" · ")}</div>
   </div>
 </div>
 

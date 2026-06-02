@@ -2,13 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, GripVertical, X } from "lucide-react";
 import { api } from "../../services/api.js";
 import { usePermissions } from "../../hooks/usePermissions.js";
-import {
-  COMPANY_LIMITED_WRITE_FIELDS,
-  pickCompanyPayloadForSave,
-} from "../../lib/permissions.js";
+import { COMPANY_LIMITED_WRITE_FIELDS } from "../../lib/permissions.js";
 
 const TABS = [
   { id: "company", label: "Company Info" },
+  { id: "sales", label: "Sales Person Details" },
   { id: "payment", label: "Payment Details" },
   { id: "email", label: "Email Config" },
   { id: "defaults", label: "Defaults" },
@@ -62,16 +60,28 @@ export function SettingsPage({ data, reload }) {
   const saveSettings = async () => {
     const payload = { id: s.id || "default" };
 
-    if (canWriteSettingsTab("company")) {
-      payload.company = pickCompanyPayloadForSave(company, isAccountOwner);
+    // Only save the active tab — admin has write on both company and sales; sending both
+    // used to overwrite company with sales-only fields and blank company info.
+    if (tab === "company" && canWriteSettingsTab("company")) {
+      payload.company = company;
     }
-    if (canWriteSettingsTab("payment")) {
+    if (tab === "sales" && canWriteSettingsTab("sales")) {
+      payload.company = isAccountOwner
+        ? company
+        : {
+            signatory: company?.signatory || "",
+            designation: company?.designation || "",
+            phone: company?.phone || "",
+            email: company?.email || "",
+          };
+    }
+    if (tab === "payment" && canWriteSettingsTab("payment")) {
       payload.payment = payment;
     }
-    if (canWriteSettingsTab("email")) {
+    if (tab === "email" && canWriteSettingsTab("email")) {
       payload.email = email;
     }
-    if (canWriteSettingsTab("defaults")) {
+    if (tab === "defaults" && canWriteSettingsTab("defaults")) {
       payload.defaults = defaults;
     }
 
@@ -110,7 +120,7 @@ export function SettingsPage({ data, reload }) {
   }
 
   const companyCanEditAll = isAccountOwner;
-  const companyCanEditLimited = !isAccountOwner && canWriteSettingsTab("company");
+  const companyCanEditLimited = false;
 
   return (
     <div className="page">
@@ -132,9 +142,9 @@ export function SettingsPage({ data, reload }) {
       <div className="card form-card">
         {tab === "company" && (
           <>
-            {companyCanEditLimited && (
+            {!isAccountOwner && (
               <div className="settings-limited-banner">
-                You can update signatory details and the about section. Other company fields are view only.
+                Company info is managed by the account owner. You can view these details but cannot edit them.
               </div>
             )}
             <CompanyTab
@@ -145,6 +155,13 @@ export function SettingsPage({ data, reload }) {
               readOnly={!canWriteSettingsTab("company")}
             />
           </>
+        )}
+        {tab === "sales" && (
+          <SalesTab
+            form={company}
+            onChange={(f, v) => setCompany((p) => ({ ...p, [f]: v }))}
+            readOnly={!canWriteSettingsTab("sales")}
+          />
         )}
         {tab === "payment" && (
           <PaymentTab
@@ -250,10 +267,6 @@ function CompanyTab({ form, onChange, canEditAll, canEditLimited, readOnly }) {
           onChange={ro("address") ? undefined : (e) => onChange("address", e.target.value)}
         />
       </label>
-      <Field label="Signatory Name" value={form.signatory} onChange={change("signatory")} readOnly={ro("signatory")} />
-      <Field label="Designation" value={form.designation} onChange={change("designation")} readOnly={ro("designation")} />
-      <Field label="Contact Phone" value={form.phone} onChange={change("phone")} readOnly={ro("phone")} placeholder="e.g. 98100 55678" />
-      <Field label="Contact Email" value={form.email} onChange={change("email")} readOnly={ro("email")} placeholder="e.g. sales@yourcompany.com" />
       <label className="span-2">
         <span className="field-label">About (shown in proposals)</span>
         <textarea
@@ -264,6 +277,31 @@ function CompanyTab({ form, onChange, canEditAll, canEditLimited, readOnly }) {
           onChange={ro("about") ? undefined : (e) => onChange("about", e.target.value)}
         />
       </label>
+    </div>
+  );
+}
+
+function SalesTab({ form, onChange, readOnly }) {
+  const change = (field) => (readOnly ? undefined : (v) => onChange(field, v));
+
+  return (
+    <div className="settings-grid">
+      <Field label="Signatory Name" value={form.signatory} onChange={change("signatory")} readOnly={readOnly} />
+      <Field label="Designation" value={form.designation} onChange={change("designation")} readOnly={readOnly} />
+      <Field
+        label="Contact Phone"
+        value={form.phone}
+        onChange={change("phone")}
+        readOnly={readOnly}
+        placeholder="e.g. 98100 55678"
+      />
+      <Field
+        label="Contact Email"
+        value={form.email}
+        onChange={change("email")}
+        readOnly={readOnly}
+        placeholder="e.g. sales@yourcompany.com"
+      />
     </div>
   );
 }

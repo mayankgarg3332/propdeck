@@ -14,10 +14,17 @@ export function usePermissions() {
     isAccountOwner,
     canRead: (section) => Boolean(permissions[section]?.read),
     canWrite: (section) => Boolean(permissions[section]?.write),
-    canReadSettingsTab: (tabId) =>
-      isAccountOwner || Boolean(permissions[SETTINGS_TAB_SECTIONS[tabId]]?.read),
-    canWriteSettingsTab: (tabId) =>
-      isAccountOwner || Boolean(permissions[SETTINGS_TAB_SECTIONS[tabId]]?.write),
+    // Company profile: owner can edit; sub-users can view (read-only) when they can open Settings.
+    canReadSettingsTab: (tabId) => {
+      if (tabId === "company") {
+        return isAccountOwner || canAccessAnySettings(permissions, false);
+      }
+      return isAccountOwner || Boolean(permissions[SETTINGS_TAB_SECTIONS[tabId]]?.read);
+    },
+    canWriteSettingsTab: (tabId) => {
+      if (tabId === "company") return isAccountOwner;
+      return isAccountOwner || Boolean(permissions[SETTINGS_TAB_SECTIONS[tabId]]?.write);
+    },
     canAccessSettings: () => canAccessAnySettings(permissions, isAccountOwner),
     settingsSectionForTab: (tabId) => SETTINGS_TAB_SECTIONS[tabId],
   };

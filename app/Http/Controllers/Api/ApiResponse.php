@@ -78,13 +78,34 @@ trait ApiResponse
 
         $result = ['id' => $full['id']];
         $sectionMap = [
-            'company' => UserPermission::SECTION_SETTINGS_COMPANY,
+            // Company profile is owner-only; sub-users won't see this tab.
+            'company' => null,
+            // Sales is stored inside company, but permission is separate.
+            // We'll include company in payload if they can read sales (so Sales tab can render).
             'payment' => UserPermission::SECTION_SETTINGS_PAYMENT,
             'email' => UserPermission::SECTION_SETTINGS_EMAIL,
             'defaults' => UserPermission::SECTION_SETTINGS_DEFAULTS,
         ];
 
+        // Sales tab needs company fields, but gated by settings_sales.
+        if ($user->canRead(UserPermission::SECTION_SETTINGS_SALES) && array_key_exists('company', $full)) {
+            $result['company'] = $full['company'];
+        }
+
+        $canAnySettingsTab = $user->canRead(UserPermission::SECTION_SETTINGS_SALES)
+            || $user->canRead(UserPermission::SECTION_SETTINGS_PAYMENT)
+            || $user->canRead(UserPermission::SECTION_SETTINGS_EMAIL)
+            || $user->canRead(UserPermission::SECTION_SETTINGS_DEFAULTS);
+
+        // Read-only company profile for sub-users who can open Settings.
+        if ($canAnySettingsTab && ! isset($result['company']) && array_key_exists('company', $full)) {
+            $result['company'] = $full['company'];
+        }
+
         foreach ($sectionMap as $key => $section) {
+            if (! $section) {
+                continue;
+            }
             if ($user->canRead($section) && array_key_exists($key, $full)) {
                 $result[$key] = $full[$key];
             }
@@ -102,6 +123,33 @@ trait ApiResponse
         }
 
         return $result;
+    }
+
+    protected function mergeEffectiveSettings(?AppSetting $account, ?AppSetting $user): ?AppSetting
+    {
+        if (! $account && ! $user) {
+            return null;
+        }
+
+        $out = new AppSetting();
+        $out->id = $account?->id ?? $user?->id ?? 'default';
+        $out->user_id = $account?->user_id ?? $user?->user_id;
+
+        $baseCompany = is_array($account?->company) ? $account->company : [];
+        $userCompany = is_array($user?->company) ? $user->company : [];
+        $mergedCompany = $baseCompany;
+        foreach (UserPermission::salesUserFields() as $field) {
+            if (array_key_exists($field, $userCompany)) {
+                $mergedCompany[$field] = $userCompany[$field];
+            }
+        }
+
+        $out->company = $mergedCompany;
+        $out->payment = is_array($user?->payment) ? $user->payment : (is_array($account?->payment) ? $account->payment : null);
+        $out->email = is_array($user?->email) ? $user->email : (is_array($account?->email) ? $account->email : null);
+        $out->defaults = is_array($user?->defaults) ? $user->defaults : (is_array($account?->defaults) ? $account->defaults : null);
+
+        return $out;
     }
 
     protected function emailSettingsPayload(?array $email): ?array
@@ -144,19 +192,31 @@ trait ApiResponse
     {
         $accountId = $user->accountUserId();
 
-        $clients = $user->canRead('clients')
-            ? Client::where('user_id', $accountId)->orderBy('agency')->get()
-            : collect();
+        $clients = collect();
+        if ($user->canRead('clients')) {
+            $q = Client::where('user_id', $accountId);
+            if (! $user->isAccountOwner()) {
+                $q->where('created_by_user_id', $user->id);
+            }
+            $clients = $q->orderBy('agency')->get();
+        }
 
         $products = $user->canRead('products')
             ? Product::where('user_id', $accountId)->orderBy('name')->get()
             : collect();
 
-        $proposals = $user->canRead('proposals')
-            ? Proposal::where('user_id', $accountId)->orderByDesc('date')->get()
-            : collect();
+        $proposals = collect();
+        if ($user->canRead('proposals')) {
+            $q = Proposal::where('user_id', $accountId);
+            if (! $user->isAccountOwner()) {
+                $q->where('created_by_user_id', $user->id);
+            }
+            $proposals = $q->orderByDesc('date')->get();
+        }
 
-        $settings = AppSetting::findForAccount($accountId);
+        $accountSettings = AppSetting::findForAccount($accountId);
+        $userSettings = AppSetting::findForUser($user->id);
+        $settings = $this->mergeEffectiveSettings($accountSettings, $userSettings);
         $rep = Rep::where('user_id', $accountId)->first();
 
         return [

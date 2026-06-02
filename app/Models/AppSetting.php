@@ -19,6 +19,11 @@ class AppSetting extends Model
         return 'default:'.$accountId;
     }
 
+    public static function userKey(int $userId): string
+    {
+        return 'user:'.$userId;
+    }
+
     public static function findForAccount(int $accountId): ?self
     {
         $scoped = static::query()->where('user_id', $accountId)->first();
@@ -27,6 +32,16 @@ class AppSetting extends Model
         }
 
         return static::query()->find(static::accountKey($accountId));
+    }
+
+    public static function findForUser(int $userId): ?self
+    {
+        $scoped = static::query()->where('user_id', $userId)->first();
+        if ($scoped) {
+            return $scoped;
+        }
+
+        return static::query()->find(static::userKey($userId));
     }
 
     /**
@@ -49,7 +64,43 @@ class AppSetting extends Model
 
         return static::query()->firstOrNew(
             ['id' => $key],
-            ['user_id' => $accountId],
+            [
+                'user_id' => $accountId,
+                'company' => [],
+                'payment' => [],
+                'email' => [],
+                'defaults' => [],
+            ],
+        );
+    }
+
+    /**
+     * Load or create settings for a specific user (per-user settings overrides).
+     */
+    public static function forUser(int $userId): self
+    {
+        $key = static::userKey($userId);
+
+        $settings = static::findForUser($userId);
+        if ($settings) {
+            if ($settings->id !== $key && ! static::query()->where('id', $key)->exists()) {
+                $settings->id = $key;
+                $settings->user_id = $userId;
+                $settings->save();
+            }
+
+            return $settings->fresh();
+        }
+
+        return static::query()->firstOrNew(
+            ['id' => $key],
+            [
+                'user_id' => $userId,
+                'company' => [],
+                'payment' => [],
+                'email' => [],
+                'defaults' => [],
+            ],
         );
     }
 

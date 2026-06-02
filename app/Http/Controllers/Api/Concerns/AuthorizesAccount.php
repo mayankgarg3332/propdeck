@@ -41,7 +41,14 @@ trait AuthorizesAccount
 
     protected function findAccountClient(Request $request, string $id): Client
     {
-        return Client::where('user_id', $this->accountUserId($request))->findOrFail($id);
+        $user = $this->currentUser($request);
+        $query = Client::where('user_id', $this->accountUserId($request));
+
+        if (! $user->isAccountOwner()) {
+            $query->where('created_by_user_id', $user->id);
+        }
+
+        return $query->findOrFail($id);
     }
 
     protected function findAccountProduct(Request $request, string $id): Product
@@ -51,6 +58,13 @@ trait AuthorizesAccount
 
     protected function findAccountProposal(Request $request, string $id): Proposal
     {
-        return Proposal::where('user_id', $this->accountUserId($request))->findOrFail($id);
+        $user = $this->currentUser($request);
+        $query = Proposal::where('user_id', $this->accountUserId($request));
+
+        if (! $user->isAccountOwner()) {
+            $query->where('created_by_user_id', $user->id);
+        }
+
+        return $query->findOrFail($id);
     }
 }

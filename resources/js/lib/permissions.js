@@ -1,5 +1,5 @@
 export const SETTINGS_TAB_SECTIONS = {
-  company: "settings_company",
+  sales: "settings_sales",
   payment: "settings_payment",
   email: "settings_email",
   defaults: "settings_defaults",

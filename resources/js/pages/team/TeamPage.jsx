@@ -24,7 +24,7 @@ const emptyForm = {
     clients: { read: true, write: false },
     proposals: { read: true, write: false },
     products: { read: true, write: false },
-    settings_company: { read: false, write: false },
+    settings_sales: { read: false, write: false },
     settings_payment: { read: false, write: false },
     settings_email: { read: false, write: false },
     settings_defaults: { read: false, write: false },
@@ -38,7 +38,7 @@ const sectionMeta = [
 ];
 
 const settingsSectionMeta = [
-  { key: "settings_company", label: "Company Info", icon: Building2, hint: "Write: signatory, designation, contact, about only" },
+  { key: "settings_sales", label: "Sales Person Details", icon: Building2, hint: "Write: signatory, designation, phone, email" },
   { key: "settings_payment", label: "Payment Details", icon: CreditCard },
   { key: "settings_email", label: "Email Config", icon: Mail },
   { key: "settings_defaults", label: "Defaults", icon: SlidersHorizontal },
@@ -328,7 +328,7 @@ export function TeamPage() {
                 </tr>
                 <tr className="team-table-subhead">
                   <th colSpan={4} />
-                  <th>Company</th>
+                  <th>Sales</th>
                   <th>Payment</th>
                   <th>Email</th>
                   <th>Defaults</th>
@@ -357,7 +357,7 @@ export function TeamPage() {
                       <PermBadge read={member.permissions?.products?.read} write={member.permissions?.products?.write} />
                     </td>
                     <td>
-                      <PermBadge read={member.permissions?.settings_company?.read} write={member.permissions?.settings_company?.write} />
+                      <PermBadge read={member.permissions?.settings_sales?.read} write={member.permissions?.settings_sales?.write} />
                     </td>
                     <td>
                       <PermBadge read={member.permissions?.settings_payment?.read} write={member.permissions?.settings_payment?.write} />

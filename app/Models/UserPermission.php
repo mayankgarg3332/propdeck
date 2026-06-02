@@ -12,18 +12,18 @@ class UserPermission extends Model
 
     public const SECTION_PRODUCTS = 'products';
 
-    public const SECTION_SETTINGS_COMPANY = 'settings_company';
-
     public const SECTION_SETTINGS_PAYMENT = 'settings_payment';
 
     public const SECTION_SETTINGS_EMAIL = 'settings_email';
 
     public const SECTION_SETTINGS_DEFAULTS = 'settings_defaults';
 
-    /** Company fields sub-users may edit when they have settings_company write. */
-    public static function companySubUserWritableFields(): array
+    public const SECTION_SETTINGS_SALES = 'settings_sales';
+
+    /** Fields that belong to the per-user "Sales Person Details" tab. */
+    public static function salesUserFields(): array
     {
-        return ['signatory', 'designation', 'phone', 'email', 'about'];
+        return ['signatory', 'designation', 'phone', 'email'];
     }
 
     public static function sections(): array
@@ -32,7 +32,7 @@ class UserPermission extends Model
             self::SECTION_CLIENTS,
             self::SECTION_PROPOSALS,
             self::SECTION_PRODUCTS,
-            self::SECTION_SETTINGS_COMPANY,
+            self::SECTION_SETTINGS_SALES,
             self::SECTION_SETTINGS_PAYMENT,
             self::SECTION_SETTINGS_EMAIL,
             self::SECTION_SETTINGS_DEFAULTS,

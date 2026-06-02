@@ -43,12 +43,21 @@ class ProposalController extends Controller
     {
         $accountId = $this->accountUserId($request);
 
+        $user = $this->currentUser($request);
+
+        $clientExistsRule = Rule::exists('clients', 'id')->where(function ($q) use ($accountId, $user) {
+            $q->where('user_id', $accountId);
+            if (! $user->isAccountOwner()) {
+                $q->where('created_by_user_id', $user->id);
+            }
+        });
+
         $data = $request->validate([
             'id' => 'required|string|max:64',
             'clientId' => [
                 'required',
                 'string',
-                Rule::exists('clients', 'id')->where(fn ($q) => $q->where('user_id', $accountId)),
+                $clientExistsRule,
             ],
             'products' => 'required|array',
             'amount' => 'required|numeric',
@@ -65,14 +74,14 @@ class ProposalController extends Controller
             'createdAt' => 'nullable|date',
         ]);
 
-        $user = $this->currentUser($request);
-
         $settings = AppSetting::findForAccount($accountId);
         $proposalId = $data['id'];
         $proposal = Proposal::find($proposalId);
 
         if ($proposal && (int) $proposal->user_id === (int) $accountId) {
-            // Update this account's existing proposal.
+            if (! $user->isAccountOwner() && (int) $proposal->created_by_user_id !== (int) $user->id) {
+                abort(403, 'You do not have permission for this proposal.');
+            }
         } elseif (Proposal::where('id', $proposalId)->exists()) {
             $proposalId = $this->nextProposalId($accountId, $settings);
             $proposal = new Proposal(['id' => $proposalId]);

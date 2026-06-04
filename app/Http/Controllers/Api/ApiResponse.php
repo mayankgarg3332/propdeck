@@ -145,9 +145,15 @@ trait ApiResponse
         }
 
         $out->company = $mergedCompany;
-        $out->payment = is_array($user?->payment) ? $user->payment : (is_array($account?->payment) ? $account->payment : null);
-        $out->email = is_array($user?->email) ? $user->email : (is_array($account?->email) ? $account->email : null);
-        $out->defaults = is_array($user?->defaults) ? $user->defaults : (is_array($account?->defaults) ? $account->defaults : null);
+        // Use sub-user override only when they have explicitly set values (non-empty array).
+        // An empty [] means "no override" — fall back to account settings.
+        $hasUserPayment = is_array($user?->payment) && count($user->payment) > 0;
+        $hasUserEmail   = is_array($user?->email)   && count($user->email)   > 0;
+        $hasUserDefaults = is_array($user?->defaults) && count($user->defaults) > 0;
+
+        $out->payment  = $hasUserPayment  ? $user->payment  : (is_array($account?->payment)  ? $account->payment  : null);
+        $out->email    = $hasUserEmail    ? $user->email    : (is_array($account?->email)    ? $account->email    : null);
+        $out->defaults = $hasUserDefaults ? $user->defaults : (is_array($account?->defaults) ? $account->defaults : null);
 
         return $out;
     }

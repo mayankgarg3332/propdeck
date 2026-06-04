@@ -1,4 +1,4 @@
-const CACHE_NAME = "tripdeck-shell-v1";
+const CACHE_NAME = "propdeck-shell-v1";
 const APP_SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icons/icon.svg"];
 
 self.addEventListener("install", (event) => {

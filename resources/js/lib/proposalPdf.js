@@ -3,6 +3,7 @@ import { formatDate } from "./format.js";
 import {
   getProposalHeaderColor,
   headerSubtitleColorPdf,
+  buildProposalTheme,
 } from "./proposalTheme.js";
 
 // Helvetica (the only built-in jsPDF font) has no ₹ glyph — use Rs. instead
@@ -45,7 +46,6 @@ export function totalsFromProposal(proposal) {
   return { subtotal: proposal.subtotal, gst: proposal.gst, total: proposal.amount };
 }
 
-const GREEN2 = "#1d9e75";
 const GRAY_BG = "#f8fafc";
 const AMBER_BG = "#fffbeb";
 const AMBER_TEXT = "#92400e";
@@ -66,6 +66,7 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
   const company = settings?.company || {};
   const headerColor = getProposalHeaderColor(company);
   const headerMuted = headerSubtitleColorPdf(headerColor);
+  const { primary: ac, primaryDark: acd, primaryBg: acbg, primaryBadgeBg: acbadge, primaryOnSolid: acos } = buildProposalTheme(headerColor);
   const payment = settings?.payment || {};
   const kyc = settings?.defaults?.kyc || [];
   const terms = settings?.defaults?.terms || [];
@@ -144,7 +145,7 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
       doc.setDrawColor("#e5e7eb");
       doc.setLineWidth(0.5);
       doc.rect(M, y, CW, cardH, "FD");
-      doc.setFillColor(item.product.color || GREEN2);
+      doc.setFillColor(item.product.color || ac);
       doc.rect(M, y, 4, cardH, "F");
 
       const iX = M + 16;
@@ -161,12 +162,12 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8);
       const badgeW = doc.getTextWidth(badgeLabel) + 8;
-      doc.setFillColor("#ecfdf5");
+      doc.setFillColor(acbadge);
       doc.rect(badgeX, y + 6, badgeW, 13, "F");
-      txt(badgeLabel, badgeX + 4, y + 15.5, { size: 8, bold: true, color: GREEN2 });
+      txt(badgeLabel, badgeX + 4, y + 15.5, { size: 8, bold: true, color: acd });
 
       // Price right-aligned
-      txt(inr(item.final), pw - M - 12, y + 16, { size: 11, bold: true, color: GREEN2, align: "right" });
+      txt(inr(item.final), pw - M - 12, y + 16, { size: 11, bold: true, color: ac, align: "right" });
 
       // Per-item billing label
       const itemBillingLabel = (() => {
@@ -187,7 +188,7 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
       // Features with checkmarks
       let fY = y + 44;
       features.forEach((feat) => {
-        doc.setFillColor(GREEN2);
+        doc.setFillColor(ac);
         doc.rect(iX, fY - 7, 7, 7, "F");
         doc.setTextColor("#ffffff");
         doc.setFont("helvetica", "bold");
@@ -244,7 +245,7 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
       }
 
       txt(disc > 0 ? `${disc}%` : "—", TC[3].x + 4, y + 16, { size: 9, color: CD });
-      txt(inr(item.final), TC[4].x + 4, y + 16, { size: 9, bold: true, color: GREEN2 });
+      txt(inr(item.final), TC[4].x + 4, y + 16, { size: 9, bold: true, color: ac });
 
       doc.setDrawColor("#e5e7eb");
       doc.setLineWidth(0.4);
@@ -268,11 +269,11 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
 
     // Total Payable
     need(52);
-    doc.setFillColor(GREEN2);
+    doc.setFillColor(ac);
     doc.rect(M, y, CW, 52, "F");
     txt("TOTAL PAYABLE", M + 10, y + 20, { size: 11, bold: true, color: "#ffffff" });
     txt(inr(totals.total), pw - M - 14, y + 20, { size: 12, bold: true, color: "#ffffff", align: "right" });
-    txt(amountInWords(totals.total), M + 10, y + 38, { size: 8, color: "#d7f5ec", maxWidth: CW - 24 });
+    txt(amountInWords(totals.total), M + 10, y + 38, { size: 8, color: acos, maxWidth: CW - 24 });
     y += 52;
 
     y += 8;
@@ -291,11 +292,11 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
     });
     y += 8;
     need(36);
-    doc.setFillColor(GREEN2);
+    doc.setFillColor(ac);
     doc.rect(M, y, CW, 52, "F");
     txt("TOTAL PAYABLE", M + 10, y + 20, { size: 11, bold: true, color: "#ffffff" });
     txt(inr(proposal.amount), pw - M - 14, y + 20, { size: 12, bold: true, color: "#ffffff", align: "right" });
-    txt(amountInWords(proposal.amount), M + 10, y + 38, { size: 8, color: "#d7f5ec", maxWidth: CW - 24 });
+    txt(amountInWords(proposal.amount), M + 10, y + 38, { size: 8, color: acos, maxWidth: CW - 24 });
     y += 60;
     txt(`Prices in INR. GST @ ${gstRate}% applicable.`, M, y, { size: 8, color: CMU });
     y += 20;
@@ -315,11 +316,11 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
     const extrasBoxH = extrasLines.length * lineH + 18;
     need(extrasBoxH + 10);
 
-    doc.setFillColor("#f0fdf8");
-    doc.setDrawColor(GREEN2);
+    doc.setFillColor(acbg);
+    doc.setDrawColor(ac);
     doc.setLineWidth(1);
     doc.rect(M, y, CW, extrasBoxH, "FD");
-    doc.setFillColor(GREEN2);
+    doc.setFillColor(ac);
     doc.rect(M, y, 3, extrasBoxH, "F");
 
     let eY = y + 14;
@@ -344,11 +345,11 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
     [["IFSC", payment.ifsc], ["UPI ID", payment.upi]],
   ];
   const boxH = bankRows.length * 30 + 16;
-  doc.setFillColor("#f0fdf8");
-  doc.setDrawColor(headerColor);
+  doc.setFillColor(acbg);
+  doc.setDrawColor(ac);
   doc.setLineWidth(1);
   doc.rect(M, y, CW, boxH, "FD");
-  doc.setFillColor(headerColor);
+  doc.setFillColor(ac);
   doc.rect(M, y, 3, boxH, "F");
 
   let bY = y + 18;

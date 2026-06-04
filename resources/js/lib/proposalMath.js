@@ -31,7 +31,7 @@ export function summarizeProposal(lineItems, gstRate = 18) {
 }
 
 export function nextProposalId(proposals, settings) {
-  const prefix = settings?.defaults?.proposalPrefix?.trim() || "TC";
+  const prefix = settings?.defaults?.proposalPrefix?.trim() || "PD";
   const startNumber = Math.max(1, Number(settings?.defaults?.proposalStartNumber) || 1);
   const year = new Date().getFullYear();
 

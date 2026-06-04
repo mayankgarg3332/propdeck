@@ -43,7 +43,7 @@ export function SignupPage() {
     <div className="auth-shell">
       <div className="auth-card">
         <h1>Create your account</h1>
-        <p className="auth-subtitle">One account for your TripDeck proposal workspace.</p>
+        <p className="auth-subtitle">One account for your PropDeck proposal workspace.</p>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <label>

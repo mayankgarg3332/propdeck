@@ -10,11 +10,11 @@ use App\Models\Rep;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
-class TripDeckSeeder extends Seeder
+class PropDeckSeeder extends Seeder
 {
     public function run(): void
     {
-        $data = TripDeckSeedData::all();
+        $data = PropDeckSeedData::all();
         $ownerId = User::whereNull('parent_user_id')->orderBy('id')->value('id');
 
         foreach ($data['reps'] as $rep) {

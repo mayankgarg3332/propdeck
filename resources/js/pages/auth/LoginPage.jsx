@@ -32,7 +32,7 @@ export function LoginPage() {
     <div className="auth-shell">
       <div className="auth-card">
         <h1>Sign in to Propdeck</h1>
-        <p className="auth-subtitle">Access your TripDeck proposal studio.</p>
+        <p className="auth-subtitle">Access your PropDeck proposal studio.</p>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <label>

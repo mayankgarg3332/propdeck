@@ -81,7 +81,7 @@ function AppLayout() {
       />
       <main className="workspace">
         <TopBar
-          title={titles[location.pathname] || "TripDeck"}
+          title={titles[location.pathname] || "PropDeck"}
           onSearch={() => setSearchOpen(true)}
           rep={state.rep}
           settings={state.settings}
@@ -94,7 +94,7 @@ function AppLayout() {
               API error: {error}. Run <code>composer dev</code> or sign in again.
             </div>
           )}
-          {!ready && !error && <div className="loading-state">Preparing TripDeck...</div>}
+          {!ready && !error && <div className="loading-state">Preparing PropDeck...</div>}
           {ready && (
             <Routes>
               <Route path="/" element={<DashboardPage {...pageProps} />} />
@@ -155,7 +155,7 @@ function AuthRoutes() {
   );
 }
 
-export default function TripDeckApp() {
+export default function PropDeckApp() {
   return (
     <BrowserRouter>
       <AuthProvider>

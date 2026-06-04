@@ -4,9 +4,9 @@ namespace Database\Seeders;
 
 /**
  * Initial demo catalog for local/staging only.
- * Loaded by TripDeckSeeder into MySQL — not used by the React app at runtime.
+ * Loaded by PropDeckSeeder into MySQL — not used by the React app at runtime.
  */
-class TripDeckSeedData
+class PropDeckSeedData
 {
     public static function all(): array
     {

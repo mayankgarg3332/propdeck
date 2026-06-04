@@ -2,7 +2,7 @@
     "$schema": "https://getcomposer.org/schema.json",
     "name": "tripclap/propdeck",
     "type": "project",
-    "description": "TripDeck proposal studio — Laravel API with React frontend.",
+    "description": "PropDeck proposal studio — Laravel API with React frontend.",
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {

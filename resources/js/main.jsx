@@ -1,6 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import TripDeckApp from "./TripDeckApp.jsx";
+import PropDeckApp from "./PropDeckApp.jsx";
 import "../css/app.css";
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
@@ -13,7 +13,7 @@ const root = document.getElementById("root");
 if (root) {
   createRoot(root).render(
     <React.StrictMode>
-      <TripDeckApp />
+      <PropDeckApp />
     </React.StrictMode>,
   );
 }

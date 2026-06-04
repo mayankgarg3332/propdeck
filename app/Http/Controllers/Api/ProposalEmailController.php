@@ -26,9 +26,14 @@ class ProposalEmailController extends Controller
             'proposalId' => 'nullable|string|max:64',
         ]);
 
+        $user = $this->currentUser($request);
         $accountId = $this->accountUserId($request);
-        $settings = AppSetting::findForAccount($accountId);
-        $emailConfig = $settings?->email;
+
+        // Use the sub-user's own SMTP config if they have one, otherwise fall back to account.
+        $accountSettings = AppSetting::findForAccount($accountId);
+        $userSettings = AppSetting::findForUser($user->id);
+        $effectiveSettings = $this->mergeEffectiveSettings($accountSettings, $userSettings);
+        $emailConfig = $effectiveSettings?->email;
 
         try {
             AccountMailer::send($emailConfig, $data['to'], $data['subject'], $data['htmlBody']);

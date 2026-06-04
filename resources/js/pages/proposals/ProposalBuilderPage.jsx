@@ -6,7 +6,7 @@ import { buildLineItems, nextProposalId, summarizeProposal } from "../../lib/pro
 import { upsertProposal } from "../../services/api.js";
 import { downloadProposalPdf } from "../../lib/proposalPdf.js";
 import { getProposalHeaderColor, headerSubtitleColor, buildProposalTheme } from "../../lib/proposalTheme.js";
-import { buildProposalHtmlEmail, billingLabel, renderExtrasHtml } from "../../lib/proposalEmail.js";
+import { buildProposalHtmlEmail, generateUpiQr, billingLabel, renderExtrasHtml } from "../../lib/proposalEmail.js";
 
 const steps = ["Client Details", "Select Products", "Pricing", "Preview & Send"];
 
@@ -22,6 +22,13 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
   const [saved, setSaved] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [upiQrDataUrl, setUpiQrDataUrl] = useState(null);
+
+  const upiId = data.settings?.payment?.upi || "";
+  const companyName = data.settings?.company?.name || "";
+  useEffect(() => {
+    generateUpiQr(upiId, companyName).then(setUpiQrDataUrl);
+  }, [upiId, companyName]);
 
   const [proposalId, setProposalId] = useState(
     () => data.nextProposalId ?? nextProposalId(data.proposals, data.settings),
@@ -125,6 +132,7 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
       lineItems,
       totals,
       frequency,
+      upiQrDataUrl,
     });
   };
 
@@ -277,7 +285,7 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
             </button>
           </div>
           {saveError && <div className="form-error" style={{ marginBottom: 16 }}>{saveError}</div>}
-          <ProposalPreview client={client} data={data} lineItems={lineItems} totals={totals} proposalId={proposalId} paymentLink={paymentLink} frequency={frequency} extrasHeading={extrasHeading.trim()} extrasText={extrasText.trim()} />
+          <ProposalPreview client={client} data={data} lineItems={lineItems} totals={totals} proposalId={proposalId} paymentLink={paymentLink} frequency={frequency} extrasHeading={extrasHeading.trim()} extrasText={extrasText.trim()} upiQrDataUrl={upiQrDataUrl} />
         </div>
       )}
 
@@ -295,7 +303,7 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
           subject={(data.settings?.email?.subjectTemplate || "Proposal {{id}} for {{agency}}")
             .replace("{{id}}", proposalId)
             .replace("{{agency}}", client.agency || "")}
-          htmlBody={buildProposalHtmlEmail({ client, proposalId, lineItems, totals, paymentLink, frequency, extrasHeading: extrasHeading.trim(), extrasText: extrasText.trim(), settings: data.settings, rep: data.rep })}
+          htmlBody={buildProposalHtmlEmail({ client, proposalId, lineItems, totals, paymentLink, frequency, extrasHeading: extrasHeading.trim(), extrasText: extrasText.trim(), settings: data.settings, rep: data.rep, upiQrDataUrl })}
           proposalId={proposalId}
           onBeforeSend={async () => {
             const saved = await saveProposal("Draft");
@@ -442,7 +450,7 @@ function renderExtrasJsx(extrasText) {
   });
 }
 
-function ProposalPreview({ client, data, lineItems, totals, proposalId, paymentLink, frequency, extrasHeading, extrasText }) {
+function ProposalPreview({ client, data, lineItems, totals, proposalId, paymentLink, frequency, extrasHeading, extrasText, upiQrDataUrl }) {
   const company = data.settings?.company || {};
   const headerColor = getProposalHeaderColor(company);
   const headerSub = headerSubtitleColor();
@@ -576,13 +584,27 @@ function ProposalPreview({ client, data, lineItems, totals, proposalId, paymentL
         {/* Bank Transfer */}
         <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", marginBottom: 10 }}>Bank Transfer Details</div>
         <div style={{ border: `1.5px solid ${ac}`, borderRadius: 8, overflow: "hidden", background: acbg, marginBottom: 20 }}>
-          <div style={{ borderLeft: `4px solid ${ac}`, padding: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px" }}>
-            {[["Bank", payment.bank], ["Account Holder", payment.holder || payment.bank], ["Account No", payment.account], ["Account Type", payment.type], ["IFSC", payment.ifsc], ["UPI ID", payment.upi]].map(([label, value]) => (
-              <div key={label}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#6b7280", textTransform: "uppercase" }}>{label}</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{value || "—"}</div>
+          <div style={{ borderLeft: `4px solid ${ac}`, padding: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px" }}>
+              {[["Bank", payment.bank], ["Account Holder", payment.holder || payment.bank], ["Account No", payment.account], ["Account Type", payment.type], ["IFSC", payment.ifsc]].map(([label, value]) => (
+                <div key={label}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#6b7280", textTransform: "uppercase" }}>{label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{value || "—"}</div>
+                </div>
+              ))}
+            </div>
+            {(upiQrDataUrl || payment.upi) && (
+              <div style={{ borderTop: `1px solid ${ac}22`, marginTop: 12, paddingTop: 12, display: "flex", alignItems: "center", gap: 14 }}>
+                {upiQrDataUrl && (
+                  <img src={upiQrDataUrl} width={90} height={90} style={{ display: "block", borderRadius: 6, border: "1px solid #e5e7eb", flexShrink: 0 }} alt="UPI QR" />
+                )}
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: acd, marginBottom: 4 }}>PAY VIA UPI</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#111827", wordBreak: "break-all", marginBottom: 6 }}>{payment.upi}</div>
+                  <div style={{ fontSize: 10, color: "#6b7280" }}>Scan with GPay · PhonePe · Paytm · any UPI app</div>
+                </div>
               </div>
-            ))}
+            )}
           </div>
         </div>
 

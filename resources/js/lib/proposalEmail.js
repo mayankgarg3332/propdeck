@@ -1,5 +1,25 @@
+import QRCode from "qrcode";
 import { amountInWords, formatDate } from "./format.js";
 import { getProposalHeaderColor, headerSubtitleColor, buildProposalTheme } from "./proposalTheme.js";
+
+/**
+ * Generate a static UPI QR code as a base64 PNG data URL.
+ * Returns null if upiId is blank.
+ */
+export async function generateUpiQr(upiId, payeeName = "") {
+  if (!upiId?.trim()) return null;
+  const params = new URLSearchParams({ pa: upiId.trim(), pn: payeeName.trim() || "Payment", cu: "INR" });
+  const upiString = `upi://pay?${params.toString()}`;
+  try {
+    return await QRCode.toDataURL(upiString, {
+      width: 160,
+      margin: 1,
+      color: { dark: "#111827", light: "#ffffff" },
+    });
+  } catch {
+    return null;
+  }
+}
 
 export function billingLabel(billing) {
   if (!billing) return "";
@@ -75,6 +95,7 @@ export function buildProposalHtmlEmail({
   settings,
   rep,
   proposalDate = null,
+  upiQrDataUrl = null,
 }) {
   const payment = settings?.payment || {};
   const kyc = settings?.defaults?.kyc || [];
@@ -252,10 +273,21 @@ export function buildProposalHtmlEmail({
           <div style="font-size:13px;font-weight:600;color:#111827;margin-bottom:10px;">${payment.holder || payment.bank || "—"}</div>
           <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;">Account Type</div>
           <div style="font-size:13px;font-weight:600;color:#111827;margin-bottom:10px;">${payment.type || "—"}</div>
-          <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;">UPI ID</div>
-          <div style="font-size:13px;font-weight:600;color:#111827;">${payment.upi || "—"}</div>
         </td>
       </tr></table>
+      ${(upiQrDataUrl || payment.upi) ? `
+      <div style="border-top:1px solid ${ac}22;margin-top:12px;padding-top:12px;">
+        <table style="width:100%;border-collapse:collapse;"><tr>
+          ${upiQrDataUrl ? `<td style="width:100px;vertical-align:middle;padding-right:14px;">
+            <img src="${upiQrDataUrl}" width="90" height="90" style="display:block;border-radius:6px;border:1px solid #e5e7eb;" alt="UPI QR"/>
+          </td>` : ""}
+          <td style="vertical-align:middle;">
+            <div style="font-size:11px;font-weight:700;color:${acd};margin-bottom:4px;">PAY VIA UPI</div>
+            <div style="font-size:12px;font-weight:600;color:#111827;word-break:break-all;margin-bottom:6px;">${payment.upi || ""}</div>
+            <div style="font-size:10px;color:#6b7280;">Scan with GPay · PhonePe · Paytm · any UPI app</div>
+          </td>
+        </tr></table>
+      </div>` : ""}
     </div>
   </div>
 

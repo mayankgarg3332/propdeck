@@ -1,8 +1,17 @@
+import { useState, useEffect } from "react";
 import { SendProposalEmailModal } from "../../components/SendProposalEmailModal.jsx";
-import { buildProposalHtmlEmail, lineItemsFromSnapshot, totalsFromProposal } from "../../lib/proposalEmail.js";
+import { buildProposalHtmlEmail, generateUpiQr, lineItemsFromSnapshot, totalsFromProposal } from "../../lib/proposalEmail.js";
 import { api } from "../../services/api.js";
 
 export function ResendEmailModal({ proposal, client, settings, rep, reload, onClose }) {
+  const [upiQrDataUrl, setUpiQrDataUrl] = useState(null);
+
+  const upiId = settings?.payment?.upi || "";
+  const companyName = settings?.company?.name || "";
+  useEffect(() => {
+    generateUpiQr(upiId, companyName).then(setUpiQrDataUrl);
+  }, [upiId, companyName]);
+
   const defaultSubject = (settings?.email?.subjectTemplate || "Proposal {{id}} for {{agency}}")
     .replace("{{id}}", proposal.id)
     .replace("{{agency}}", client?.agency || "");
@@ -22,6 +31,7 @@ export function ResendEmailModal({ proposal, client, settings, rep, reload, onCl
     settings,
     rep,
     proposalDate: proposal.date,
+    upiQrDataUrl,
   });
 
   return (

@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api } from "../../services/api.js";
 import { downloadProposalPdf, lineItemsFromProposal, totalsFromProposal } from "../../lib/proposalPdf.js";
+import { generateUpiQr } from "../../lib/proposalEmail.js";
 import { ProposalRows } from "../dashboard/DashboardPage.jsx";
 import { ProposalDetailModal } from "./ProposalDetailModal.jsx";
 import { ResendEmailModal } from "./ResendEmailModal.jsx";
@@ -12,6 +13,13 @@ const editableStatuses = statuses.filter((status) => status !== "All");
 export function ProposalsPage({ data, reload }) {
   const perms = usePermissions();
   const [status, setStatus] = useState("All");
+  const [upiQrDataUrl, setUpiQrDataUrl] = useState(null);
+
+  const upiId = data.settings?.payment?.upi || "";
+  const companyName = data.settings?.company?.name || "";
+  useEffect(() => {
+    generateUpiQr(upiId, companyName).then(setUpiQrDataUrl);
+  }, [upiId, companyName]);
   const [proposalToDelete, setProposalToDelete] = useState(null);
   const [viewingProposal, setViewingProposal] = useState(null);
   const [resendProposal, setResendProposal] = useState(null);
@@ -45,6 +53,7 @@ export function ProposalsPage({ data, reload }) {
       lineItems: lineItemsFromProposal(proposal),
       totals: totalsFromProposal(proposal),
       frequency: proposal.frequency,
+      upiQrDataUrl,
     });
   };
 

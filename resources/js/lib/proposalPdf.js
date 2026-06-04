@@ -55,7 +55,7 @@ const CM = "#374151";
 const CL = "#6b7280";
 const CMU = "#9ca3af";
 
-export function downloadProposalPdf({ proposal, client, settings, rep, lineItems, totals, frequency }) {
+export function downloadProposalPdf({ proposal, client, settings, rep, lineItems, totals, frequency, upiQrDataUrl = null }) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
@@ -335,16 +335,18 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
 
   // ── BANK TRANSFER ─────────────────────────────────────────
   y += 8;
-  need(110);
-  txt("Bank Transfer Details", M, y, { size: 12, bold: true });
-  y += 14;
-
+  const qrSize = 72;
+  const upiStripH = (upiQrDataUrl || payment.upi) ? (qrSize + 24) : 0;
   const bankRows = [
     [["Bank", payment.bank], ["Account Holder", payment.holder || payment.bank]],
     [["Account No", payment.account], ["Account Type", payment.type]],
-    [["IFSC", payment.ifsc], ["UPI ID", payment.upi]],
+    [["IFSC", payment.ifsc], ["", ""]],
   ];
-  const boxH = bankRows.length * 30 + 16;
+  const boxH = bankRows.length * 30 + 16 + upiStripH;
+  need(boxH + 30);
+  txt("Bank Transfer Details", M, y, { size: 12, bold: true });
+  y += 14;
+
   doc.setFillColor(acbg);
   doc.setDrawColor(ac);
   doc.setLineWidth(1);
@@ -356,10 +358,32 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
   bankRows.forEach(([left, right]) => {
     txt(left[0], M + 14, bY, { size: 7.5, bold: true, color: CL });
     txt(left[1] || "—", M + 14, bY + 12, { size: 9, bold: true, color: CD, maxWidth: CW / 2 - 20 });
-    txt(right[0], M + CW / 2 + 10, bY, { size: 7.5, bold: true, color: CL });
-    txt(right[1] || "—", M + CW / 2 + 10, bY + 12, { size: 9, bold: true, color: CD, maxWidth: CW / 2 - 14 });
+    if (right[0]) {
+      txt(right[0], M + CW / 2 + 10, bY, { size: 7.5, bold: true, color: CL });
+      txt(right[1] || "—", M + CW / 2 + 10, bY + 12, { size: 9, bold: true, color: CD, maxWidth: CW / 2 - 14 });
+    }
     bY += 30;
   });
+
+  // UPI QR strip
+  if (upiQrDataUrl || payment.upi) {
+    doc.setDrawColor(ac + "33");
+    doc.setLineWidth(0.5);
+    doc.line(M + 14, bY, M + CW - 14, bY);
+    bY += 10;
+    if (upiQrDataUrl) {
+      doc.addImage(upiQrDataUrl, "PNG", M + 14, bY, qrSize, qrSize);
+    }
+    const textX = upiQrDataUrl ? M + 14 + qrSize + 12 : M + 14;
+    txt("PAY VIA UPI", textX, bY + 11, { size: 8, bold: true, color: acd });
+    const upiLines = doc.splitTextToSize(payment.upi || "", CW - (upiQrDataUrl ? qrSize + 44 : 28));
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(CD);
+    doc.text(upiLines, textX, bY + 24);
+    txt("Scan with GPay · PhonePe · Paytm · any UPI app", textX, bY + 24 + upiLines.length * 12 + 4, { size: 7.5, color: CL });
+  }
+
   y += boxH + 18;
 
   // ── KYC ──────────────────────────────────────────────────

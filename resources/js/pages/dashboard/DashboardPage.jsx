@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FileText, IndianRupee, PlusCircle, CheckCircle2 } from "lucide-react";
 import { formatDate, formatDateTime, formatINR, getStatusStyle } from "../../lib/format.js";
 import { downloadProposalPdf, lineItemsFromProposal, totalsFromProposal } from "../../lib/proposalPdf.js";
+import { generateUpiQr } from "../../lib/proposalEmail.js";
 import { ProposalDetailModal } from "../proposals/ProposalDetailModal.jsx";
 import { ResendEmailModal } from "../proposals/ResendEmailModal.jsx";
 import { usePermissions } from "../../hooks/usePermissions.js";
@@ -45,7 +46,14 @@ export function DashboardPage({ data, reload, navigate, openNewProposal }) {
   const perms = usePermissions();
   const [viewingProposal, setViewingProposal] = useState(null);
   const [resendProposal, setResendProposal] = useState(null);
+  const [upiQrDataUrl, setUpiQrDataUrl] = useState(null);
   const { thisMonthCount, deltaLabel, accepted, acceptanceRate, revenue } = computeStats(data.proposals);
+
+  const upiId = data.settings?.payment?.upi || "";
+  const companyName = data.settings?.company?.name || "";
+  useEffect(() => {
+    generateUpiQr(upiId, companyName).then(setUpiQrDataUrl);
+  }, [upiId, companyName]);
 
   const stats = [
     { label: "Proposals this month", value: String(thisMonthCount), sub: deltaLabel, icon: FileText },
@@ -103,6 +111,7 @@ export function DashboardPage({ data, reload, navigate, openNewProposal }) {
             lineItems: lineItemsFromProposal(proposal),
             totals: totalsFromProposal(proposal),
             frequency: proposal.frequency,
+            upiQrDataUrl,
           })}
         />
       </div>
@@ -122,6 +131,7 @@ export function DashboardPage({ data, reload, navigate, openNewProposal }) {
             lineItems: lineItemsFromProposal(proposal),
             totals: totalsFromProposal(proposal),
             frequency: proposal.frequency,
+            upiQrDataUrl,
           })}
         />
       )}

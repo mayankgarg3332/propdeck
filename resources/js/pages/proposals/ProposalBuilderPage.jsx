@@ -303,7 +303,7 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
           subject={(data.settings?.email?.subjectTemplate || "Proposal {{id}} for {{agency}}")
             .replace("{{id}}", proposalId)
             .replace("{{agency}}", client.agency || "")}
-          htmlBody={buildProposalHtmlEmail({ client, proposalId, lineItems, totals, paymentLink, frequency, extrasHeading: extrasHeading.trim(), extrasText: extrasText.trim(), settings: data.settings, rep: data.rep, upiQrDataUrl })}
+          htmlBody={buildProposalHtmlEmail({ client, proposalId, lineItems, totals, paymentLink, frequency, extrasHeading: extrasHeading.trim(), extrasText: extrasText.trim(), settings: data.settings, rep: data.rep })}
           proposalId={proposalId}
           onBeforeSend={async () => {
             const saved = await saveProposal("Draft");

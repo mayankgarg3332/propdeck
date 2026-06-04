@@ -77,6 +77,18 @@ export function totalsFromProposal(proposal) {
 }
 
 /**
+ * Build a hosted QR image URL for use in email HTML.
+ * Email clients block data: URIs, so we use api.qrserver.com which returns
+ * a plain HTTPS image URL that renders in every email client.
+ */
+function upiQrEmailUrl(upiId, payeeName = "") {
+  if (!upiId?.trim()) return null;
+  const params = new URLSearchParams({ pa: upiId.trim(), pn: payeeName.trim() || "Payment", cu: "INR" });
+  const upiString = `upi://pay?${params.toString()}`;
+  return `https://api.qrserver.com/v1/create-qr-code/?size=90x90&margin=1&data=${encodeURIComponent(upiString)}`;
+}
+
+/**
  * Build the full rich HTML email for a proposal.
  * Used by both the New Proposal builder and the Resend flow.
  *
@@ -95,7 +107,6 @@ export function buildProposalHtmlEmail({
   settings,
   rep,
   proposalDate = null,
-  upiQrDataUrl = null,
 }) {
   const payment = settings?.payment || {};
   const kyc = settings?.defaults?.kyc || [];
@@ -108,6 +119,8 @@ export function buildProposalHtmlEmail({
   const { primary: ac, primaryDark: acd, primaryBg: acbg, primaryBadgeBg: acbadge } = buildProposalTheme(headerColor);
   const freqLabel = frequency || "monthly";
   const repEmail = company.email || rep?.email || "";
+  // Use a hosted QR URL for email — data: URIs are blocked by Gmail/Outlook/Apple Mail
+  const emailQrUrl = upiQrEmailUrl(payment.upi, company.name);
   const signatory = company.signatory || rep?.name || "Sales Team";
   const phone = company.phone || rep?.phone || "";
 
@@ -275,11 +288,11 @@ export function buildProposalHtmlEmail({
           <div style="font-size:13px;font-weight:600;color:#111827;margin-bottom:10px;">${payment.type || "—"}</div>
         </td>
       </tr></table>
-      ${(upiQrDataUrl || payment.upi) ? `
+      ${(emailQrUrl || payment.upi) ? `
       <div style="border-top:1px solid ${ac}22;margin-top:12px;padding-top:12px;">
         <table style="width:100%;border-collapse:collapse;"><tr>
-          ${upiQrDataUrl ? `<td style="width:100px;vertical-align:middle;padding-right:14px;">
-            <img src="${upiQrDataUrl}" width="90" height="90" style="display:block;border-radius:6px;border:1px solid #e5e7eb;" alt="UPI QR"/>
+          ${emailQrUrl ? `<td style="width:100px;vertical-align:middle;padding-right:14px;">
+            <img src="${emailQrUrl}" width="90" height="90" style="display:block;border-radius:6px;border:1px solid #e5e7eb;" alt="UPI QR"/>
           </td>` : ""}
           <td style="vertical-align:middle;">
             <div style="font-size:11px;font-weight:700;color:${acd};margin-bottom:4px;">PAY VIA UPI</div>

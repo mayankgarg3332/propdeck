@@ -1,5 +1,9 @@
 import { jsPDF } from "jspdf";
 import { formatDate } from "./format.js";
+import {
+  getProposalHeaderColor,
+  headerSubtitleColorPdf,
+} from "./proposalTheme.js";
 
 // Helvetica (the only built-in jsPDF font) has no ₹ glyph — use Rs. instead
 const inr = (v) => `Rs.${Number(v || 0).toLocaleString("en-IN")}`;
@@ -41,7 +45,6 @@ export function totalsFromProposal(proposal) {
   return { subtotal: proposal.subtotal, gst: proposal.gst, total: proposal.amount };
 }
 
-const GREEN = "#0f6e56";
 const GREEN2 = "#1d9e75";
 const GRAY_BG = "#f8fafc";
 const AMBER_BG = "#fffbeb";
@@ -61,6 +64,8 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
   let y = 0;
 
   const company = settings?.company || {};
+  const headerColor = getProposalHeaderColor(company);
+  const headerMuted = headerSubtitleColorPdf(headerColor);
   const payment = settings?.payment || {};
   const kyc = settings?.defaults?.kyc || [];
   const terms = settings?.defaults?.terms || [];
@@ -95,13 +100,13 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
   };
 
   // ── HEADER ───────────────────────────────────────────────
-  doc.setFillColor(GREEN);
+  doc.setFillColor(headerColor);
   doc.rect(0, 0, pw, 90, "F");
   y = 34;
   txt(company.name || "Propdeck", M, y, { size: 18, bold: true, color: "#ffffff" });
-  txt(company.tagline || "", M, y + 18, { size: 9, color: "#d7eee6" });
+  txt(company.tagline || "", M, y + 18, { size: 9, color: headerMuted });
   txt(proposal.id, pw - M, y, { size: 13, bold: true, color: "#ffffff", align: "right" });
-  txt(`Prepared for ${client?.agency || ""}`, pw - M, y + 18, { size: 9, color: "#d7eee6", align: "right" });
+  txt(`Prepared for ${client?.agency || ""}`, pw - M, y + 18, { size: 9, color: headerMuted, align: "right" });
 
   // ── META STRIP ───────────────────────────────────────────
   doc.setFillColor(GRAY_BG);
@@ -340,10 +345,10 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
   ];
   const boxH = bankRows.length * 30 + 16;
   doc.setFillColor("#f0fdf8");
-  doc.setDrawColor(GREEN);
+  doc.setDrawColor(headerColor);
   doc.setLineWidth(1);
   doc.rect(M, y, CW, boxH, "FD");
-  doc.setFillColor(GREEN);
+  doc.setFillColor(headerColor);
   doc.rect(M, y, 3, boxH, "F");
 
   let bY = y + 18;
@@ -399,7 +404,7 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
   doc.setLineWidth(0.5);
   doc.line(M, y, pw - M, y);
   y += 16;
-  txt(company.name || "Propdeck", pw / 2, y, { size: 11, bold: true, color: GREEN, align: "center" });
+  txt(company.name || "Propdeck", pw / 2, y, { size: 11, bold: true, color: headerColor, align: "center" });
   y += 14;
   if (company.address) {
     const addrLines = doc.splitTextToSize(company.address.replace(/\n/g, ", "), CW - 60);

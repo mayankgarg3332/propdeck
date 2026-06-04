@@ -5,6 +5,7 @@ import { formatINR, amountInWords } from "../../lib/format.js";
 import { buildLineItems, nextProposalId, summarizeProposal } from "../../lib/proposalMath.js";
 import { upsertProposal } from "../../services/api.js";
 import { downloadProposalPdf } from "../../lib/proposalPdf.js";
+import { getProposalHeaderColor, headerSubtitleColor } from "../../lib/proposalTheme.js";
 
 const steps = ["Client Details", "Select Products", "Pricing", "Preview & Send"];
 
@@ -452,6 +453,8 @@ function buildHtmlEmail({ client, proposalId, lineItems, totals, paymentLink, fr
   const gstRate = settings.defaults?.gstRate || 18;
   const validityDays = settings.defaults?.validityDays || 7;
   const company = settings.company || {};
+  const headerColor = getProposalHeaderColor(company);
+  const headerSub = headerSubtitleColor();
   const freqLabel = frequency || "monthly";
   const repEmail = company.email || rep?.email || "";
 
@@ -520,12 +523,12 @@ function buildHtmlEmail({ client, proposalId, lineItems, totals, paymentLink, fr
 <div style="max-width:640px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
 
 <!-- Header -->
-<div style="background:#0f6e56;padding:26px 32px;">
+<div style="background:${headerColor};padding:26px 32px;">
   <table style="width:100%;border-collapse:collapse;"><tr>
     <td><div style="color:#fff;font-size:20px;font-weight:800;">${company.name || "Propdeck"}</div>
-      <div style="color:rgba(255,255,255,0.6);font-size:11px;margin-top:3px;">${company.tagline || ""}</div></td>
+      <div style="color:${headerSub};font-size:11px;margin-top:3px;">${company.tagline || ""}</div></td>
     <td style="text-align:right;"><div style="color:#fff;font-size:14px;font-weight:700;">${proposalId}</div>
-      <div style="color:rgba(255,255,255,0.6);font-size:11px;margin-top:3px;">Prepared for ${client.agency || ""}</div></td>
+      <div style="color:${headerSub};font-size:11px;margin-top:3px;">Prepared for ${client.agency || ""}</div></td>
   </tr></table>
 </div>
 
@@ -671,6 +674,8 @@ function renderExtrasJsx(extrasText) {
 
 function ProposalPreview({ client, data, lineItems, totals, proposalId, paymentLink, frequency, extrasHeading, extrasText }) {
   const company = data.settings?.company || {};
+  const headerColor = getProposalHeaderColor(company);
+  const headerSub = headerSubtitleColor();
   const payment = data.settings?.payment || {};
   const kyc = data.settings?.defaults?.kyc || [];
   const terms = data.settings?.defaults?.terms || [];
@@ -692,15 +697,15 @@ function ProposalPreview({ client, data, lineItems, totals, proposalId, paymentL
     <div style={{ maxWidth: 680, margin: "0 auto", background: "#fff", borderRadius: 12, overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,0.10)", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
 
       {/* Header */}
-      <div style={{ background: "#0f6e56", padding: "24px 32px" }}>
+      <div style={{ background: headerColor, padding: "24px 32px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
             <div style={{ color: "#fff", fontSize: 20, fontWeight: 800 }}>{company.name || "Propdeck"}</div>
-            <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 11, marginTop: 3 }}>{company.tagline || ""}</div>
+            <div style={{ color: headerSub, fontSize: 11, marginTop: 3 }}>{company.tagline || ""}</div>
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>{proposalId}</div>
-            <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 11, marginTop: 3 }}>Prepared for {client.agency}</div>
+            <div style={{ color: headerSub, fontSize: 11, marginTop: 3 }}>Prepared for {client.agency}</div>
           </div>
         </div>
       </div>

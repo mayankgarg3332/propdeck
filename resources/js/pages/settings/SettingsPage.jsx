@@ -257,6 +257,26 @@ function CompanyTab({ form, onChange, canEditAll, canEditLimited, readOnly }) {
       <Field label="Tagline" value={form.tagline} onChange={change("tagline")} readOnly={ro("tagline")} span placeholder="e.g. Empowering Travel Agents Across India" />
       <Field label="GST Number" value={form.gst} onChange={change("gst")} readOnly={ro("gst")} />
       <Field label="Website" value={form.website} onChange={change("website")} readOnly={ro("website")} />
+      <label>
+        <span className="field-label">Proposal header color</span>
+        <div className="proposal-header-color-row">
+          <input
+            className="proposal-header-color-swatch"
+            type="color"
+            value={form.proposalHeaderColor || "#0f6e56"}
+            disabled={ro("proposalHeaderColor")}
+            onChange={ro("proposalHeaderColor") ? undefined : (e) => onChange("proposalHeaderColor", e.target.value)}
+          />
+          <input
+            className="input"
+            value={form.proposalHeaderColor || "#0f6e56"}
+            placeholder="#0f6e56"
+            readOnly={ro("proposalHeaderColor")}
+            onChange={ro("proposalHeaderColor") ? undefined : (e) => onChange("proposalHeaderColor", e.target.value)}
+          />
+        </div>
+        <span className="field-hint">Used on proposal emails and PDF header bar</span>
+      </label>
       <label className="span-2">
         <span className="field-label">Registered Address</span>
         <textarea

@@ -1,5 +1,6 @@
 import { formatDate, amountInWords } from "../../lib/format.js";
 import { SendProposalEmailModal } from "../../components/SendProposalEmailModal.jsx";
+import { getProposalHeaderColor, headerSubtitleColor } from "../../lib/proposalTheme.js";
 import { api } from "../../services/api.js";
 
 export function ResendEmailModal({ proposal, client, settings, rep, reload, onClose }) {
@@ -36,6 +37,8 @@ export function ResendEmailModal({ proposal, client, settings, rep, reload, onCl
 
 function buildResendHtml({ proposal, client, settings, rep }) {
   const company = settings?.company || {};
+  const headerColor = getProposalHeaderColor(company);
+  const headerSub = headerSubtitleColor();
   const payment = settings?.payment || {};
   const kyc = settings?.defaults?.kyc || [];
   const terms = settings?.defaults?.terms || [];
@@ -70,12 +73,12 @@ function buildResendHtml({ proposal, client, settings, rep }) {
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;">
 <div style="max-width:640px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
 
-<div style="background:#0f6e56;padding:26px 32px;">
+<div style="background:${headerColor};padding:26px 32px;">
   <table style="width:100%;border-collapse:collapse;"><tr>
     <td><div style="color:#fff;font-size:20px;font-weight:800;">${company.name || "Propdeck"}</div>
-      <div style="color:rgba(255,255,255,0.6);font-size:11px;margin-top:3px;">${company.tagline || ""}</div></td>
+      <div style="color:${headerSub};font-size:11px;margin-top:3px;">${company.tagline || ""}</div></td>
     <td style="text-align:right;"><div style="color:#fff;font-size:14px;font-weight:700;">${proposal.id}</div>
-      <div style="color:rgba(255,255,255,0.6);font-size:11px;margin-top:3px;">Prepared for ${client?.agency || ""}</div></td>
+      <div style="color:${headerSub};font-size:11px;margin-top:3px;">Prepared for ${client?.agency || ""}</div></td>
   </tr></table>
 </div>
 

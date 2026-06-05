@@ -228,11 +228,28 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
         planRows.forEach((rowPlans) => {
           const numCols = rowPlans.length;
           const colW2 = Math.floor((CW - (numCols - 1) * 5) / numCols);
-          const maxFeatures = Math.max(...rowPlans.map((a) => (a.plan.features || []).length));
-          const compCardH = 10 + maxFeatures * 13 + 60;
+          const featMaxW = colW2 - 14;
+
+          // ── Pre-measure each column's actual height ──────────
+          // Must set font+size before splitTextToSize so wrapping is accurate
+          const colData = rowPlans.map(({ plan, isRec, price, disc }) => {
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(7.5);
+            const featureLineGroups = (plan.features || []).map((f) =>
+              doc.splitTextToSize(`- ${f}`, featMaxW)
+            );
+            const featH = featureLineGroups.reduce((s, ls) => s + ls.length * 10, 0);
+            const badgeH  = isRec ? 18 : 0;
+            const discH   = (isRec && disc > 0) ? 11 : 0;
+            const billingH = plan.billing ? 11 : 5;
+            const totalH  = 14 + badgeH + 14 + discH + 12 + billingH + featH + 8;
+            return { plan, isRec, price, disc, featureLineGroups, totalH };
+          });
+          const compCardH = Math.max(...colData.map((c) => c.totalH));
           need(compCardH + 10);
 
-          rowPlans.forEach(({ plan, isRec, price, disc }, ci) => {
+          // ── Draw each column ──────────────────────────────────
+          colData.forEach(({ plan, isRec, price, disc, featureLineGroups }, ci) => {
             const cx = M + ci * (colW2 + 5);
             const cy = y;
 
@@ -241,40 +258,69 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
             doc.setLineWidth(isRec ? 1.5 : 0.5);
             doc.rect(cx, cy, colW2, compCardH, "FD");
 
-            let ry = cy + 12;
+            let ry = cy + 14;
 
+            // Recommended badge
             if (isRec) {
               doc.setFillColor(ac);
               doc.setFont("helvetica", "bold");
               doc.setFontSize(7);
-              const recW = doc.getTextWidth("Recommended") + 8;
-              doc.rect(cx + 6, ry - 8, recW, 11, "F");
+              const recLabel = "Recommended";
+              const recW = doc.getTextWidth(recLabel) + 10;
+              doc.rect(cx + 6, ry - 9, recW, 12, "F");
               doc.setTextColor("#ffffff");
-              doc.text("Recommended", cx + 10, ry - 0.5);
-              ry += 8;
+              doc.text(recLabel, cx + 11, ry - 1);
+              ry += 18;
             }
 
-            txt(plan.name, cx + 6, ry + 2, { size: 9, bold: true, color: CD, maxWidth: colW2 - 12 });
-            ry += 13;
+            // Plan name (may wrap — use maxWidth)
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(9);
+            doc.setTextColor(CD);
+            const nameLines = doc.splitTextToSize(plan.name, colW2 - 12);
+            doc.text(nameLines, cx + 6, ry);
+            ry += nameLines.length * 12;
 
+            // Strikethrough MRP
             if (isRec && disc > 0) {
-              txt(inr(item.mrp), cx + 6, ry, { size: 7.5, color: CMU, maxWidth: colW2 - 12 });
-              ry += 10;
-            }
-            txt(inr(price), cx + 6, ry, { size: 9.5, bold: true, color: isRec ? ac : CD, maxWidth: colW2 - 12 });
-            ry += 11;
-
-            const bl = plan.billing === "monthly" ? "/mo" : plan.billing === "annual" ? "/yr" : plan.billing === "one-time" ? "once" : "";
-            if (bl) { txt(bl, cx + 6, ry, { size: 7, color: CMU }); ry += 10; }
-            else ry += 4;
-
-            (plan.features || []).forEach((feat) => {
-              const flines = doc.splitTextToSize(`✓ ${feat}`, colW2 - 12);
               doc.setFont("helvetica", "normal");
               doc.setFontSize(7.5);
-              doc.setTextColor(isRec ? CM : CL);
-              doc.text(flines, cx + 6, ry);
-              ry += flines.length * 10;
+              doc.setTextColor(CMU);
+              const mrpStr = inr(item.mrp);
+              doc.text(mrpStr, cx + 6, ry);
+              const mw = doc.getTextWidth(mrpStr);
+              doc.setDrawColor(CMU);
+              doc.setLineWidth(0.5);
+              doc.line(cx + 6, ry - 4, cx + 6 + mw, ry - 4);
+              ry += 11;
+            }
+
+            // Price
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(9.5);
+            doc.setTextColor(isRec ? ac : CD);
+            doc.text(inr(price), cx + 6, ry);
+            ry += 12;
+
+            // Billing label
+            const bl = plan.billing === "monthly" ? "/mo" : plan.billing === "annual" ? "/yr" : plan.billing === "one-time" ? "once" : "";
+            if (bl) {
+              doc.setFont("helvetica", "normal");
+              doc.setFontSize(7);
+              doc.setTextColor(CMU);
+              doc.text(bl, cx + 6, ry);
+              ry += 11;
+            } else {
+              ry += 5;
+            }
+
+            // Features — already split at correct font size
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(7.5);
+            doc.setTextColor(isRec ? CM : CL);
+            featureLineGroups.forEach((lines) => {
+              doc.text(lines, cx + 6, ry);
+              ry += lines.length * 10;
             });
           });
 

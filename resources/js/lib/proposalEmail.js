@@ -1,6 +1,7 @@
 import QRCode from "qrcode";
 import { amountInWords, formatDate } from "./format.js";
 import { getProposalHeaderColor, headerSubtitleColor, buildProposalTheme } from "./proposalTheme.js";
+import { billingLabel as _billingLabel } from "./billingTypes.js";
 
 /**
  * Generate a static UPI QR code as a base64 PNG data URL.
@@ -21,12 +22,8 @@ export async function generateUpiQr(upiId, payeeName = "") {
   }
 }
 
-export function billingLabel(billing) {
-  if (!billing) return "";
-  if (billing === "monthly") return "per month";
-  if (billing === "annual") return "per year";
-  if (billing === "one-time") return "one-time";
-  return billing;
+export function billingLabel(value, settings) {
+  return _billingLabel(value, settings);
 }
 
 export function renderExtrasHtml(extrasText) {
@@ -168,7 +165,7 @@ export function buildProposalHtmlEmail({
       </td>
       <td style="text-align:right;white-space:nowrap;vertical-align:top;">
         ${mrpHtml}<div style="font-size:16px;font-weight:800;color:${ac};">${inr(item.final)}</div>
-        ${item.plan.billing ? `<div style="font-size:11px;color:#9ca3af;">${billingLabel(item.plan.billing)}</div>` : ""}
+        ${item.plan.billing ? `<div style="font-size:11px;color:#9ca3af;">${billingLabel(item.plan.billing, settings)}</div>` : ""}
       </td>
     </tr></table>
   </div>

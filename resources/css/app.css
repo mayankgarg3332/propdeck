@@ -1278,6 +1278,45 @@ kbd {
   font-size: 13px;
 }
 
+.billing-types-table {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.billing-types-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 120px 32px;
+  gap: 0;
+  background: #f9fafb;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.billing-types-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 120px 32px;
+  gap: 0;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  gap: 8px;
+}
+
+.billing-types-row:last-child {
+  border-bottom: none;
+}
+
+.billing-types-row .input {
+  font-size: 13px;
+  padding: 6px 10px;
+}
+
 .settings-save-row {
   display: flex;
   align-items: center;

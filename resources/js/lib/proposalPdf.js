@@ -5,6 +5,7 @@ import {
   headerSubtitleColorPdf,
   buildProposalTheme,
 } from "./proposalTheme.js";
+import { billingLabel as _billingLabel, billingShortLabel } from "./billingTypes.js";
 
 // Helvetica (the only built-in jsPDF font) has no ₹ glyph — use Rs. instead
 const inr = (v) => `Rs.${Number(v || 0).toLocaleString("en-IN")}`;
@@ -176,14 +177,7 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
 
         txt(inr(item.final), pw - M - 12, y + 16, { size: 11, bold: true, color: ac, align: "right" });
 
-        const bl = (() => {
-          const b = item.plan?.billing;
-          if (!b) return "";
-          if (b === "monthly") return "per month";
-          if (b === "annual") return "per year";
-          if (b === "one-time") return "one-time";
-          return b;
-        })();
+        const bl = _billingLabel(item.plan?.billing, settings);
         if (bl) txt(bl, pw - M - 12, y + 29, { size: 7.5, color: CMU, align: "right" });
 
         txt(item.plan.description, iX, y + 30, { size: 8.5, color: CL });
@@ -303,7 +297,7 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
             ry += 12;
 
             // Billing label
-            const bl = plan.billing === "monthly" ? "/mo" : plan.billing === "annual" ? "/yr" : plan.billing === "one-time" ? "once" : "";
+            const bl = billingShortLabel(plan.billing, settings);
             if (bl) {
               doc.setFont("helvetica", "normal");
               doc.setFontSize(7);

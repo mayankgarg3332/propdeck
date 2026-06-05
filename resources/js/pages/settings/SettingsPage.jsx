@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, GripVertical, X } from "lucide-react";
+import { Check, GripVertical, X, Plus } from "lucide-react";
 import { api } from "../../services/api.js";
 import { usePermissions } from "../../hooks/usePermissions.js";
 import { COMPANY_LIMITED_WRITE_FIELDS } from "../../lib/permissions.js";
+import { DEFAULT_BILLING_TYPES } from "../../lib/billingTypes.js";
 
 const TABS = [
   { id: "company", label: "Company Info" },
@@ -34,6 +35,7 @@ export function SettingsPage({ data, reload }) {
     ...(s.defaults || {}),
     kyc: [...(s.defaults?.kyc || [])],
     terms: [...(s.defaults?.terms || [])],
+    billingTypes: [...(s.defaults?.billingTypes || DEFAULT_BILLING_TYPES)],
   });
   const [saved, setSaved] = useState(false);
   const [newKyc, setNewKyc] = useState("");
@@ -402,6 +404,21 @@ function EmailTab({ form, onChange, readOnly }) {
 
 function DefaultsTab({ form, onChange, newKyc, setNewKyc, onAddKyc, onKycKey, onRemoveKyc, readOnly }) {
   const termsText = (form.terms || []).join("\n");
+  const billingTypes = form.billingTypes || DEFAULT_BILLING_TYPES;
+
+  const updateBillingType = (index, field, value) => {
+    const updated = billingTypes.map((t, i) => i === index ? { ...t, [field]: value } : t);
+    onChange("billingTypes", updated);
+  };
+
+  const addBillingType = () => {
+    onChange("billingTypes", [...billingTypes, { value: "", label: "", shortLabel: "" }]);
+  };
+
+  const removeBillingType = (index) => {
+    if (billingTypes.length <= 1) return; // must keep at least one
+    onChange("billingTypes", billingTypes.filter((_, i) => i !== index));
+  };
 
   return (
     <div className="settings-grid">
@@ -447,6 +464,62 @@ function DefaultsTab({ form, onChange, newKyc, setNewKyc, onAddKyc, onKycKey, on
           onChange={readOnly ? undefined : (e) => onChange("proposalStartNumber", Math.max(1, Number(e.target.value)))}
         />
         <span className="field-hint">New proposals start from this number (auto-skips taken ones)</span>
+      </div>
+
+      {/* ── Billing Types ─────────────────────────────────── */}
+      <div className="span-2">
+        <span className="field-label">Billing Types</span>
+        <span className="field-hint" style={{ display: "block", marginBottom: 10 }}>
+          Shown in plan dropdowns and on proposals. <strong>Value</strong> is the internal key (don't change after use). <strong>Label</strong> is the full name. <strong>Short</strong> appears next to prices.
+        </span>
+        <div className="billing-types-table">
+          <div className="billing-types-header">
+            <span>Value (key)</span>
+            <span>Label</span>
+            <span>Short label</span>
+            {!readOnly && <span></span>}
+          </div>
+          {billingTypes.map((bt, i) => (
+            <div className="billing-types-row" key={i}>
+              <input
+                className="input"
+                value={bt.value}
+                placeholder="e.g. monthly"
+                readOnly={readOnly}
+                onChange={readOnly ? undefined : (e) => updateBillingType(i, "value", e.target.value.toLowerCase().replace(/\s+/g, "-"))}
+              />
+              <input
+                className="input"
+                value={bt.label}
+                placeholder="e.g. Monthly"
+                readOnly={readOnly}
+                onChange={readOnly ? undefined : (e) => updateBillingType(i, "label", e.target.value)}
+              />
+              <input
+                className="input"
+                value={bt.shortLabel}
+                placeholder="e.g. /mo"
+                readOnly={readOnly}
+                onChange={readOnly ? undefined : (e) => updateBillingType(i, "shortLabel", e.target.value)}
+              />
+              {!readOnly && (
+                <button
+                  className="kyc-remove"
+                  onClick={() => removeBillingType(i)}
+                  disabled={billingTypes.length <= 1}
+                  title="Remove"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+          ))}
+          {!readOnly && (
+            <button className="button" style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6 }} onClick={addBillingType}>
+              <Plus size={14} /> Add billing type
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="span-2">

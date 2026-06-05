@@ -3,6 +3,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { api } from "../../services/api.js";
 import { formatINR } from "../../lib/format.js";
 import { usePermissions } from "../../hooks/usePermissions.js";
+import { getBillingTypes } from "../../lib/billingTypes.js";
 
 const presetColors = ["#f59e0b", "#3b82f6", "#8b5cf6", "#ef4444", "#1d9e75", "#ec4899", "#f97316", "#06b6d4"];
 
@@ -15,6 +16,7 @@ const blankProduct = {
 
 export function ProductsPage({ data, reload }) {
   const perms = usePermissions();
+  const billingTypes = getBillingTypes(data.settings);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newProduct, setNewProduct] = useState(blankProduct);
   const [savedProduct, setSavedProduct] = useState(null);
@@ -330,10 +332,9 @@ export function ProductsPage({ data, reload }) {
               <label>
                 <span className="field-label">Billing Type</span>
                 <select className="select" value={planForm.billing} onChange={(event) => setPlanField("billing", event.target.value)}>
-                  <option value="monthly">Monthly</option>
-                  <option value="quarterly">Quarterly</option>
-                  <option value="annual">Annual</option>
-                  <option value="one-time">One-time</option>
+                  {billingTypes.map((bt) => (
+                    <option key={bt.value} value={bt.value}>{bt.label}</option>
+                  ))}
                 </select>
               </label>
               <label className="span-2">

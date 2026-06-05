@@ -6,7 +6,8 @@ import { buildLineItems, nextProposalId, summarizeProposal, normalizeSelection }
 import { upsertProposal } from "../../services/api.js";
 import { downloadProposalPdf } from "../../lib/proposalPdf.js";
 import { getProposalHeaderColor, headerSubtitleColor, buildProposalTheme } from "../../lib/proposalTheme.js";
-import { buildProposalHtmlEmail, generateUpiQr, billingLabel, renderExtrasHtml } from "../../lib/proposalEmail.js";
+import { buildProposalHtmlEmail, generateUpiQr, renderExtrasHtml } from "../../lib/proposalEmail.js";
+import { billingLabel, getBillingTypes } from "../../lib/billingTypes.js";
 
 const steps = ["Client Details", "Select Products", "Pricing", "Preview & Send"];
 
@@ -40,6 +41,8 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
   const totals = summarizeProposal(lineItems, data.settings?.defaults?.gstRate || 18);
   // Derive frequency label from the billing types of selected plans
   const frequency = [...new Set(lineItems.map((i) => i.plan.billing).filter(Boolean))].join(", ") || "monthly";
+  const billingTypes = getBillingTypes(data.settings);
+  const frequencyLabel = [...new Set(lineItems.map((i) => i.plan.billing).filter(Boolean))].map((v) => billingLabel(v, data.settings)).join(" + ") || billingLabel("monthly", data.settings);
 
   const toggleProduct = (product) => {
     setSelections((current) => {
@@ -341,7 +344,7 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
                 <div className="summary-row" key={item.product.id}>
                   <span>
                     {item.product.name} ({item.plan.name})
-                    {item.plan.billing && <em className="billing-tag">{item.plan.billing}</em>}
+                    {item.plan.billing && <em className="billing-tag">{billingLabel(item.plan.billing, data.settings)}</em>}
                   </span>
                   <strong>{formatINR(item.final)}</strong>
                 </div>
@@ -350,7 +353,7 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
               <div className="summary-row"><span>GST ({data.settings?.defaults?.gstRate || 18}%)</span><strong>{formatINR(totals.gst)}</strong></div>
               <div className="total-row"><span>Total Payable</span><strong>{formatINR(totals.total)}</strong></div>
               {frequency && (
-                <div className="billing-note">Billing: {frequency}</div>
+                <div className="billing-note">Billing: {frequencyLabel}</div>
               )}
               <label>
                 <span className="field-label">Payment Link (optional)</span>
@@ -639,7 +642,7 @@ function ProposalPreview({ client, data, lineItems, totals, proposalId, paymentL
                   <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 16 }}>
                     {disc > 0 && <div style={{ textDecoration: "line-through", color: "#9ca3af", fontSize: 11 }}>{formatINR(item.mrp)}</div>}
                     <div style={{ fontSize: 15, fontWeight: 800, color: ac }}>{formatINR(item.final)}</div>
-                    {item.plan.billing && <div style={{ fontSize: 10, color: "#9ca3af" }}>{billingLabel(item.plan.billing)}</div>}
+                    {item.plan.billing && <div style={{ fontSize: 10, color: "#9ca3af" }}>{billingLabel(item.plan.billing, data.settings)}</div>}
                   </div>
                 </div>
                 <div style={{ padding: "8px 16px 10px", background: "#fff" }}>
@@ -684,7 +687,7 @@ function ProposalPreview({ client, data, lineItems, totals, proposalId, paymentL
                     <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>{plan.description}</div>
                     {isRec && d > 0 && <div style={{ textDecoration: "line-through", color: "#9ca3af", fontSize: 11 }}>{formatINR(planMrp)}</div>}
                     <div style={{ fontSize: 15, fontWeight: 800, color: isRec ? ac : "#374151", marginBottom: 2 }}>{formatINR(price)}</div>
-                    {plan.billing && <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 8 }}>{billingLabel(plan.billing)}</div>}
+                    {plan.billing && <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 8 }}>{billingLabel(plan.billing, data.settings)}</div>}
                     {(plan.features || []).map((f) => (
                       <div key={f} style={{ fontSize: 11, color: isRec ? "#374151" : "#6b7280", padding: "2px 0" }}>
                         <span style={{ color: isRec ? ac : "#9ca3af", fontWeight: 700, marginRight: 4 }}>✓</span>{f}

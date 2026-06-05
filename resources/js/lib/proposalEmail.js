@@ -176,14 +176,18 @@ export function buildProposalHtmlEmail({
 </div>`;
       }
 
-      // Comparison card — recommended + showcase plans side by side
+      // Comparison card — recommended + showcase plans, max 3 per row
       const allPlans = [
         { plan: item.plan, isRecommended: true, finalPrice: item.final, disc },
         ...showcase.map((p) => ({ plan: p, isRecommended: false, finalPrice: p.mrp, disc: 0 })),
       ];
-      const colWidth = Math.floor(100 / allPlans.length);
+      // Split into rows of max 3
+      const rows = [];
+      for (let i = 0; i < allPlans.length; i += 3) rows.push(allPlans.slice(i, i + 3));
 
-      const planCols = allPlans.map(({ plan, isRecommended, finalPrice, disc: d }) => {
+      const buildPlanCols = (rowPlans) => {
+        const colWidth = Math.floor(100 / rowPlans.length);
+        return rowPlans.map(({ plan, isRecommended, finalPrice, disc: d }) => {
         const features = (plan.features || []).map((f) =>
           `<div style="padding:2px 0;font-size:11px;color:${isRecommended ? "#374151" : "#6b7280"};">
             <span style="color:${isRecommended ? ac : "#9ca3af"};font-weight:700;margin-right:4px;">✓</span>${f}
@@ -201,7 +205,12 @@ export function buildProposalHtmlEmail({
           ${plan.billing ? `<div style="font-size:10px;color:#9ca3af;margin-bottom:8px;">${billingLabel(plan.billing)}</div>` : "<div style='margin-bottom:8px;'></div>"}
           ${features}
         </td>`;
-      }).join(`<td style="width:8px;"></td>`);
+        }).join(`<td style="width:8px;"></td>`);
+      };
+
+      const rowTables = rows.map((rowPlans) =>
+        `<table style="width:100%;border-collapse:separate;border-spacing:0;margin-bottom:${rows.length > 1 ? "10px" : "0"};"><tr>${buildPlanCols(rowPlans)}</tr></table>`
+      ).join("");
 
       return `
 <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:12px;">
@@ -209,20 +218,19 @@ export function buildProposalHtmlEmail({
     <span style="font-size:15px;font-weight:700;color:#111827;">${item.product.name}</span>
     <div style="font-size:11px;color:#6b7280;margin-top:2px;">Choose the plan that works for you</div>
   </div>
-  <div style="padding:12px 14px;background:#fff;">
-    <table style="width:100%;border-collapse:separate;border-spacing:0;"><tr>${planCols}</tr></table>
-  </div>
+  <div style="padding:12px 14px;background:#fff;">${rowTables}</div>
 </div>`;
     }).join("");
 
+    const hasDiscount = lineItems.some((item) => (item.repDiscount + (item.frequencyDiscount || 0)) > 0);
     const pricingRows = lineItems.map((item) => {
       const disc = item.repDiscount + (item.frequencyDiscount || 0);
       const mrpCell = disc > 0 ? `<s style="color:#9ca3af;">${inr(item.mrp)}</s>` : inr(item.mrp);
       return `<tr style="border-bottom:1px solid #f3f4f6;">
       <td style="padding:10px 12px;font-size:13px;color:#374151;">${item.product.name}</td>
       <td style="padding:10px 12px;font-size:13px;color:#6b7280;">${item.plan.name}</td>
-      <td style="padding:10px 12px;font-size:13px;">${mrpCell}</td>
-      <td style="padding:10px 12px;font-size:13px;text-align:center;color:#374151;">${disc > 0 ? `${disc}%` : "—"}</td>
+      ${hasDiscount ? `<td style="padding:10px 12px;font-size:13px;">${mrpCell}</td>` : ""}
+      ${hasDiscount ? `<td style="padding:10px 12px;font-size:13px;text-align:center;color:#374151;">${disc > 0 ? `${disc}%` : "—"}</td>` : ""}
       <td style="padding:10px 12px;font-size:13px;font-weight:700;color:${ac};text-align:right;">${inr(item.final)}</td>
     </tr>`;
     }).join("");
@@ -235,9 +243,9 @@ export function buildProposalHtmlEmail({
     <thead><tr style="background:#f3f4f6;">
       <th style="padding:10px 12px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;font-weight:700;">Product</th>
       <th style="padding:10px 12px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;font-weight:700;">Plan</th>
-      <th style="padding:10px 12px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;font-weight:700;">MRP</th>
-      <th style="padding:10px 12px;text-align:center;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;font-weight:700;">Disc.%</th>
-      <th style="padding:10px 12px;text-align:right;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;font-weight:700;">Your Price</th>
+      ${hasDiscount ? `<th style="padding:10px 12px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;font-weight:700;">MRP</th>` : ""}
+      ${hasDiscount ? `<th style="padding:10px 12px;text-align:center;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;font-weight:700;">Disc.%</th>` : ""}
+      <th style="padding:10px 12px;text-align:right;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;font-weight:700;">${hasDiscount ? "Your Price" : "Amount"}</th>
     </tr></thead>
     <tbody>${pricingRows}</tbody>
   </table>

@@ -664,7 +664,7 @@ function ProposalPreview({ client, data, lineItems, totals, proposalId, paymentL
                 <span style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>{item.product.name}</span>
                 <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>Choose the plan that works for you</div>
               </div>
-              <div style={{ padding: "12px 14px", background: "#fff", display: "grid", gridTemplateColumns: `repeat(${allPlans.length}, 1fr)`, gap: 10 }}>
+              <div style={{ padding: "12px 14px", background: "#fff", display: "grid", gridTemplateColumns: `repeat(${Math.min(allPlans.length, 3)}, 1fr)`, gap: 10 }}>
                 {allPlans.map(({ plan, isRec, price, mrp: planMrp, disc: d }) => (
                   <div
                     key={plan.name}
@@ -698,32 +698,44 @@ function ProposalPreview({ client, data, lineItems, totals, proposalId, paymentL
         })}
 
         {/* Pricing table */}
-        <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", margin: "20px 0 10px" }}>Pricing Breakdown</div>
-        <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden", marginBottom: 8 }}>
-          <thead>
-            <tr style={{ background: "#f3f4f6" }}>
-              {["Product", "Plan", "MRP", "Disc.%", "Your Price"].map((h) => (
-                <th key={h} style={{ padding: "9px 10px", textAlign: h === "Your Price" ? "right" : h === "Disc.%" ? "center" : "left", fontSize: 10, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {lineItems.map((item) => {
-              const disc = item.repDiscount + (item.frequencyDiscount || 0);
-              return (
-                <tr key={item.product.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                  <td style={{ padding: "9px 10px", fontSize: 12, color: "#374151" }}>{item.product.name}</td>
-                  <td style={{ padding: "9px 10px", fontSize: 12, color: "#6b7280" }}>{item.plan.name}</td>
-                  <td style={{ padding: "9px 10px", fontSize: 12 }}>
-                    {disc > 0 ? <s style={{ color: "#9ca3af" }}>{formatINR(item.mrp)}</s> : formatINR(item.mrp)}
-                  </td>
-                  <td style={{ padding: "9px 10px", fontSize: 12, textAlign: "center" }}>{disc > 0 ? `${disc}%` : "—"}</td>
-                  <td style={{ padding: "9px 10px", fontSize: 12, fontWeight: 700, color: ac, textAlign: "right" }}>{formatINR(item.final)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        {(() => {
+          const hasDiscount = lineItems.some((item) => (item.repDiscount + (item.frequencyDiscount || 0)) > 0);
+          const headers = hasDiscount ? ["Product", "Plan", "MRP", "Disc.%", "Your Price"] : ["Product", "Plan", "Amount"];
+          return (
+            <>
+              <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", margin: "20px 0 10px" }}>Pricing Breakdown</div>
+              <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden", marginBottom: 8 }}>
+                <thead>
+                  <tr style={{ background: "#f3f4f6" }}>
+                    {headers.map((h) => (
+                      <th key={h} style={{ padding: "9px 10px", textAlign: h === "Your Price" || h === "Amount" ? "right" : h === "Disc.%" ? "center" : "left", fontSize: 10, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700 }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {lineItems.map((item) => {
+                    const disc = item.repDiscount + (item.frequencyDiscount || 0);
+                    return (
+                      <tr key={item.product.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                        <td style={{ padding: "9px 10px", fontSize: 12, color: "#374151" }}>{item.product.name}</td>
+                        <td style={{ padding: "9px 10px", fontSize: 12, color: "#6b7280" }}>{item.plan.name}</td>
+                        {hasDiscount && (
+                          <td style={{ padding: "9px 10px", fontSize: 12 }}>
+                            {disc > 0 ? <s style={{ color: "#9ca3af" }}>{formatINR(item.mrp)}</s> : formatINR(item.mrp)}
+                          </td>
+                        )}
+                        {hasDiscount && (
+                          <td style={{ padding: "9px 10px", fontSize: 12, textAlign: "center" }}>{disc > 0 ? `${disc}%` : "—"}</td>
+                        )}
+                        <td style={{ padding: "9px 10px", fontSize: 12, fontWeight: 700, color: ac, textAlign: "right" }}>{formatINR(item.final)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </>
+          );
+        })()}
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 24, padding: "6px 10px", marginBottom: 6, fontSize: 13, color: "#6b7280" }}>
           <span>Subtotal: <strong style={{ color: "#374151" }}>{formatINR(totals.subtotal)}</strong></span>

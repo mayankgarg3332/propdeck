@@ -202,17 +202,13 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
 
         y += cardH + 8;
       } else {
-        // ── Comparison card — recommended + showcase columns ──
+        // ── Comparison card — max 3 plans per row ──
         const allPlans = [
           { plan: item.plan, isRec: true, price: item.final, disc: item.repDiscount + (item.frequencyDiscount || 0) },
           ...showcase.map((p) => ({ plan: p, isRec: false, price: p.mrp, disc: 0 })),
         ];
-        const numCols = allPlans.length;
-        const colW2 = Math.floor((CW - 16) / numCols);
-        const maxFeatures = Math.max(...allPlans.map((a) => (a.plan.features || []).length));
+
         const headerH = 40;
-        const compCardH = headerH + 10 + maxFeatures * 13 + 16;
-        need(compCardH + 24);
 
         // Product header bar
         doc.setFillColor("#f9fafb");
@@ -225,57 +221,67 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
         txt("Choose the plan that works for you", M + 14, y + 28, { size: 8.5, color: CL });
         y += headerH + 6;
 
-        // Plan columns
-        allPlans.forEach(({ plan, isRec, price, disc }, ci) => {
-          const cx = M + ci * (colW2 + 5);
-          const cy = y;
+        // Split plans into rows of max 3
+        const planRows = [];
+        for (let i = 0; i < allPlans.length; i += 3) planRows.push(allPlans.slice(i, i + 3));
 
-          doc.setFillColor(isRec ? acbg : "#fff");
-          doc.setDrawColor(isRec ? ac : "#e5e7eb");
-          doc.setLineWidth(isRec ? 1.5 : 0.5);
-          doc.rect(cx, cy, colW2, compCardH, "FD");
+        planRows.forEach((rowPlans) => {
+          const numCols = rowPlans.length;
+          const colW2 = Math.floor((CW - (numCols - 1) * 5) / numCols);
+          const maxFeatures = Math.max(...rowPlans.map((a) => (a.plan.features || []).length));
+          const compCardH = 10 + maxFeatures * 13 + 60;
+          need(compCardH + 10);
 
-          let ry = cy + 12;
+          rowPlans.forEach(({ plan, isRec, price, disc }, ci) => {
+            const cx = M + ci * (colW2 + 5);
+            const cy = y;
 
-          // Recommended badge
-          if (isRec) {
-            doc.setFillColor(ac);
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(7);
-            const recW = doc.getTextWidth("Recommended") + 8;
-            doc.rect(cx + 6, ry - 8, recW, 11, "F");
-            doc.setTextColor("#ffffff");
-            doc.text("Recommended", cx + 10, ry - 0.5);
-            ry += 8;
-          }
+            doc.setFillColor(isRec ? acbg : "#fff");
+            doc.setDrawColor(isRec ? ac : "#e5e7eb");
+            doc.setLineWidth(isRec ? 1.5 : 0.5);
+            doc.rect(cx, cy, colW2, compCardH, "FD");
 
-          txt(plan.name, cx + 6, ry + 2, { size: 9, bold: true, color: CD, maxWidth: colW2 - 12 });
-          ry += 13;
+            let ry = cy + 12;
 
-          // Price
-          if (isRec && disc > 0) {
-            txt(inr(item.mrp), cx + 6, ry, { size: 7.5, color: CMU, maxWidth: colW2 - 12 });
-            ry += 10;
-          }
-          txt(inr(price), cx + 6, ry, { size: 9.5, bold: true, color: isRec ? ac : CD, maxWidth: colW2 - 12 });
-          ry += 11;
+            if (isRec) {
+              doc.setFillColor(ac);
+              doc.setFont("helvetica", "bold");
+              doc.setFontSize(7);
+              const recW = doc.getTextWidth("Recommended") + 8;
+              doc.rect(cx + 6, ry - 8, recW, 11, "F");
+              doc.setTextColor("#ffffff");
+              doc.text("Recommended", cx + 10, ry - 0.5);
+              ry += 8;
+            }
 
-          const bl = plan.billing === "monthly" ? "/mo" : plan.billing === "annual" ? "/yr" : plan.billing === "one-time" ? "once" : "";
-          if (bl) { txt(bl, cx + 6, ry, { size: 7, color: CMU }); ry += 10; }
-          else ry += 4;
+            txt(plan.name, cx + 6, ry + 2, { size: 9, bold: true, color: CD, maxWidth: colW2 - 12 });
+            ry += 13;
 
-          // Features
-          (plan.features || []).forEach((feat) => {
-            const flines = doc.splitTextToSize(`✓ ${feat}`, colW2 - 12);
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(7.5);
-            doc.setTextColor(isRec ? CM : CL);
-            doc.text(flines, cx + 6, ry);
-            ry += flines.length * 10;
+            if (isRec && disc > 0) {
+              txt(inr(item.mrp), cx + 6, ry, { size: 7.5, color: CMU, maxWidth: colW2 - 12 });
+              ry += 10;
+            }
+            txt(inr(price), cx + 6, ry, { size: 9.5, bold: true, color: isRec ? ac : CD, maxWidth: colW2 - 12 });
+            ry += 11;
+
+            const bl = plan.billing === "monthly" ? "/mo" : plan.billing === "annual" ? "/yr" : plan.billing === "one-time" ? "once" : "";
+            if (bl) { txt(bl, cx + 6, ry, { size: 7, color: CMU }); ry += 10; }
+            else ry += 4;
+
+            (plan.features || []).forEach((feat) => {
+              const flines = doc.splitTextToSize(`✓ ${feat}`, colW2 - 12);
+              doc.setFont("helvetica", "normal");
+              doc.setFontSize(7.5);
+              doc.setTextColor(isRec ? CM : CL);
+              doc.text(flines, cx + 6, ry);
+              ry += flines.length * 10;
+            });
           });
+
+          y += compCardH + 8;
         });
 
-        y += compCardH + 12;
+        y += 4;
       }
     });
 
@@ -285,12 +291,18 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
     txt("Pricing Breakdown", M, y, { size: 12, bold: true });
     y += 16;
 
-    const TC = [
+    const hasDiscount = lineItems.some((item) => (item.repDiscount + (item.frequencyDiscount || 0)) > 0);
+
+    const TC = hasDiscount ? [
       { label: "Product",    x: M,       w: 120 },
       { label: "Plan",       x: M + 120, w: 85 },
       { label: "MRP",        x: M + 205, w: 85 },
       { label: "Discount",   x: M + 290, w: 65 },
       { label: "Your Price", x: M + 355, w: CW - 355 },
+    ] : [
+      { label: "Product",    x: M,       w: 180 },
+      { label: "Plan",       x: M + 180, w: 150 },
+      { label: "Amount",     x: M + 330, w: CW - 330 },
     ];
 
     doc.setFillColor("#f3f4f6");
@@ -309,21 +321,24 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
       txt(item.product.name, TC[0].x + 4, y + 16, { size: 9, color: CD });
       txt(item.plan.name, TC[1].x + 4, y + 16, { size: 9, color: CD });
 
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      if (disc > 0) {
-        doc.setTextColor(CMU);
-        doc.text(mrpStr, TC[2].x + 4, y + 16);
-        const mw = doc.getTextWidth(mrpStr);
-        doc.setDrawColor(CMU);
-        doc.setLineWidth(0.6);
-        doc.line(TC[2].x + 4, y + 10.5, TC[2].x + 4 + mw, y + 10.5);
+      if (hasDiscount) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        if (disc > 0) {
+          doc.setTextColor(CMU);
+          doc.text(mrpStr, TC[2].x + 4, y + 16);
+          const mw = doc.getTextWidth(mrpStr);
+          doc.setDrawColor(CMU);
+          doc.setLineWidth(0.6);
+          doc.line(TC[2].x + 4, y + 10.5, TC[2].x + 4 + mw, y + 10.5);
+        } else {
+          txt(mrpStr, TC[2].x + 4, y + 16, { size: 9, color: CD });
+        }
+        txt(disc > 0 ? `${disc}%` : "—", TC[3].x + 4, y + 16, { size: 9, color: CD });
+        txt(inr(item.final), TC[4].x + 4, y + 16, { size: 9, bold: true, color: ac });
       } else {
-        txt(mrpStr, TC[2].x + 4, y + 16, { size: 9, color: CD });
+        txt(inr(item.final), TC[2].x + 4, y + 16, { size: 9, bold: true, color: ac });
       }
-
-      txt(disc > 0 ? `${disc}%` : "—", TC[3].x + 4, y + 16, { size: 9, color: CD });
-      txt(inr(item.final), TC[4].x + 4, y + 16, { size: 9, bold: true, color: ac });
 
       doc.setDrawColor("#e5e7eb");
       doc.setLineWidth(0.4);

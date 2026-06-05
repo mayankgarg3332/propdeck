@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Check, Mail } from "lucide-react";
 import { SendProposalEmailModal } from "../../components/SendProposalEmailModal.jsx";
 import { formatINR, amountInWords } from "../../lib/format.js";
-import { buildLineItems, nextProposalId, summarizeProposal } from "../../lib/proposalMath.js";
+import { buildLineItems, nextProposalId, summarizeProposal, normalizeSelection } from "../../lib/proposalMath.js";
 import { upsertProposal } from "../../services/api.js";
 import { downloadProposalPdf } from "../../lib/proposalPdf.js";
 import { getProposalHeaderColor, headerSubtitleColor, buildProposalTheme } from "../../lib/proposalTheme.js";
@@ -13,7 +13,10 @@ const steps = ["Client Details", "Select Products", "Pricing", "Preview & Send"]
 export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
   const [step, setStep] = useState(1);
   const [client, setClient] = useState(initialClient || data.clients[0] || {});
-  const [selections, setSelections] = useState({ prod_leads: "plan_leads_starter", prod_crm: "plan_crm_pro" });
+  const [selections, setSelections] = useState({
+    prod_leads: { recommended: "plan_leads_starter", showcase: [] },
+    prod_crm: { recommended: "plan_crm_pro", showcase: [] },
+  });
   const [discounts, setDiscounts] = useState({ prod_leads: 10 });
   const [paymentLink, setPaymentLink] = useState("");
   const [extrasHeading, setExtrasHeading] = useState("");
@@ -45,12 +48,46 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
         delete next[product.id];
         return next;
       }
-      return { ...current, [product.id]: product.plans[0]?.id };
+      return { ...current, [product.id]: { recommended: product.plans[0]?.id, showcase: [] } };
+    });
+  };
+
+  const setRecommendedPlan = (productId, planId) => {
+    setSelections((prev) => {
+      const sel = normalizeSelection(prev[productId]);
+      // If the new recommended was a showcase plan, remove it from showcase
+      return {
+        ...prev,
+        [productId]: {
+          recommended: planId,
+          showcase: sel.showcase.filter((id) => id !== planId),
+        },
+      };
+    });
+  };
+
+  const addShowcasePlan = (productId, planId) => {
+    setSelections((prev) => {
+      const sel = normalizeSelection(prev[productId]);
+      if (!planId || sel.recommended === planId || sel.showcase.includes(planId)) return prev;
+      return { ...prev, [productId]: { ...sel, showcase: [...sel.showcase, planId] } };
+    });
+  };
+
+  const removeShowcasePlan = (productId, planId) => {
+    setSelections((prev) => {
+      const sel = normalizeSelection(prev[productId]);
+      return { ...prev, [productId]: { ...sel, showcase: sel.showcase.filter((id) => id !== planId) } };
     });
   };
 
   const buildProductLabels = () =>
-    lineItems.map((item) => `${item.product.name} (${item.plan.name})`);
+    lineItems.map((item) => {
+      const extra = item.showcasePlans?.length
+        ? ` [+${item.showcasePlans.map((p) => p.name).join(", ")}]`
+        : "";
+      return `${item.product.name} (${item.plan.name}${extra})`;
+    });
 
   const saveProposal = async (status) => {
     const saved = await upsertProposal({
@@ -78,6 +115,13 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
         repDiscount: item.repDiscount,
         frequencyDiscount: 0,
         final: item.final,
+        showcasePlans: (item.showcasePlans || []).map((p) => ({
+          planName: p.name,
+          planDescription: p.description,
+          billing: p.billing,
+          features: p.features || [],
+          mrp: p.mrp,
+        })),
       })),
     });
     if (saved?.id && saved.id !== proposalId) {
@@ -180,18 +224,91 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
         <div className="product-select-grid">
           {data.products.map((product) => {
             const selected = Boolean(selections[product.id]);
+            const sel = selected ? normalizeSelection(selections[product.id]) : null;
+            const usedPlanIds = sel ? [sel.recommended, ...sel.showcase] : [];
+            const availablePlans = product.plans.filter((p) => !usedPlanIds.includes(p.id));
+
             return (
-              <div className={`card product-select ${selected ? "selected" : ""}`} key={product.id} onClick={() => toggleProduct(product)}>
-                <div className="product-check">{selected && <Check size={14} />}</div>
-                <div>
+              <div
+                className={`card product-select ${selected ? "selected" : ""}`}
+                key={product.id}
+                onClick={!selected ? () => toggleProduct(product) : undefined}
+              >
+                <div
+                  className="product-check"
+                  onClick={selected ? (e) => { e.stopPropagation(); toggleProduct(product); } : undefined}
+                >
+                  {selected && <Check size={14} />}
+                </div>
+                <div style={{ width: "100%" }}>
                   <h3>{product.name}</h3>
                   <p>{product.description}</p>
                   {selected ? (
-                    <select className="select" value={selections[product.id]} onClick={(event) => event.stopPropagation()} onChange={(event) => setSelections({ ...selections, [product.id]: event.target.value })}>
-                      {product.plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} - {plan.description} - {formatINR(plan.mrp)}</option>)}
-                    </select>
+                    <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 10 }}>
+                      {/* Recommended plan selector */}
+                      <div style={{ marginBottom: 8 }}>
+                        <span className="field-label" style={{ display: "block", marginBottom: 4 }}>
+                          Recommended plan <span style={{ color: "#6b7280", fontWeight: 400 }}>(used for pricing)</span>
+                        </span>
+                        <select
+                          className="select"
+                          value={sel.recommended}
+                          onChange={(e) => setRecommendedPlan(product.id, e.target.value)}
+                        >
+                          {product.plans.map((plan) => (
+                            <option key={plan.id} value={plan.id}>
+                              {plan.name} — {plan.description} — {formatINR(plan.mrp)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Showcase plan tags */}
+                      {sel.showcase.length > 0 && (
+                        <div style={{ marginBottom: 8 }}>
+                          <span className="field-label" style={{ display: "block", marginBottom: 6 }}>
+                            Also shown in proposal
+                          </span>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {sel.showcase.map((planId) => {
+                              const plan = product.plans.find((p) => p.id === planId);
+                              if (!plan) return null;
+                              return (
+                                <span key={planId} className="showcase-tag">
+                                  {plan.name} · {formatINR(plan.mrp)}
+                                  <button
+                                    className="showcase-tag-remove"
+                                    onClick={() => removeShowcasePlan(product.id, planId)}
+                                    title="Remove"
+                                  >×</button>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Add another plan to showcase */}
+                      {availablePlans.length > 0 && (
+                        <select
+                          className="select"
+                          value=""
+                          onChange={(e) => { if (e.target.value) addShowcasePlan(product.id, e.target.value); }}
+                          style={{ fontSize: 12, color: "#6b7280" }}
+                        >
+                          <option value="">+ Add plan to showcase...</option>
+                          {availablePlans.map((plan) => (
+                            <option key={plan.id} value={plan.id}>
+                              {plan.name} — {formatINR(plan.mrp)}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                   ) : (
-                    <div className="plan-tags">{product.plans.map((plan) => <span key={plan.id}>{plan.name}</span>)}</div>
+                    <div className="plan-tags">
+                      {product.plans.map((plan) => <span key={plan.id}>{plan.name}</span>)}
+                    </div>
                   )}
                 </div>
               </div>
@@ -506,24 +623,73 @@ function ProposalPreview({ client, data, lineItems, totals, proposalId, paymentL
         <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", marginBottom: 12 }}>Products Offered</div>
         {lineItems.map((item) => {
           const disc = item.repDiscount + (item.frequencyDiscount || 0);
-          return (
-            <div key={item.product.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden", marginBottom: 10 }}>
-              <div style={{ borderLeft: `4px solid ${item.product.color || ac}`, padding: "12px 16px", background: "#fafafa", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>{item.product.name}</span>
-                  <span style={{ display: "inline-block", background: acbadge, color: acd, fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, marginLeft: 8 }}>{item.plan.name}</span>
-                  <div style={{ color: "#6b7280", fontSize: 11, marginTop: 3 }}>{item.plan.description}</div>
+          const showcase = item.showcasePlans || [];
+          const hasComparison = showcase.length > 0;
+
+          if (!hasComparison) {
+            // Single plan card — existing layout
+            return (
+              <div key={item.product.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden", marginBottom: 10 }}>
+                <div style={{ borderLeft: `4px solid ${item.product.color || ac}`, padding: "12px 16px", background: "#fafafa", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>{item.product.name}</span>
+                    <span style={{ display: "inline-block", background: acbadge, color: acd, fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, marginLeft: 8 }}>{item.plan.name}</span>
+                    <div style={{ color: "#6b7280", fontSize: 11, marginTop: 3 }}>{item.plan.description}</div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 16 }}>
+                    {disc > 0 && <div style={{ textDecoration: "line-through", color: "#9ca3af", fontSize: 11 }}>{formatINR(item.mrp)}</div>}
+                    <div style={{ fontSize: 15, fontWeight: 800, color: ac }}>{formatINR(item.final)}</div>
+                    {item.plan.billing && <div style={{ fontSize: 10, color: "#9ca3af" }}>{billingLabel(item.plan.billing)}</div>}
+                  </div>
                 </div>
-                <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 16 }}>
-                  {disc > 0 && <div style={{ textDecoration: "line-through", color: "#9ca3af", fontSize: 11 }}>{formatINR(item.mrp)}</div>}
-                  <div style={{ fontSize: 15, fontWeight: 800, color: ac }}>{formatINR(item.final)}</div>
-                  {item.plan.billing && <div style={{ fontSize: 10, color: "#9ca3af" }}>{billingLabel(item.plan.billing)}</div>}
+                <div style={{ padding: "8px 16px 10px", background: "#fff" }}>
+                  {(item.plan.features || []).map((f) => (
+                    <div key={f} style={{ fontSize: 12, color: "#374151", padding: "2px 0" }}>
+                      <span style={{ color: ac, fontWeight: 700, marginRight: 5 }}>✓</span>{f}
+                    </div>
+                  ))}
                 </div>
               </div>
-              <div style={{ padding: "8px 16px 10px", background: "#fff" }}>
-                {(item.plan.features || []).map((f) => (
-                  <div key={f} style={{ fontSize: 12, color: "#374151", padding: "2px 0" }}>
-                    <span style={{ color: ac, fontWeight: 700, marginRight: 5 }}>✓</span>{f}
+            );
+          }
+
+          // Comparison card — recommended + showcase plans in columns
+          const allPlans = [
+            { plan: item.plan, isRec: true, price: item.final, mrp: item.mrp, disc },
+            ...showcase.map((p) => ({ plan: p, isRec: false, price: p.mrp, mrp: p.mrp, disc: 0 })),
+          ];
+          return (
+            <div key={item.product.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden", marginBottom: 10 }}>
+              <div style={{ borderLeft: `4px solid ${item.product.color || ac}`, padding: "12px 16px", background: "#fafafa" }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>{item.product.name}</span>
+                <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>Choose the plan that works for you</div>
+              </div>
+              <div style={{ padding: "12px 14px", background: "#fff", display: "grid", gridTemplateColumns: `repeat(${allPlans.length}, 1fr)`, gap: 10 }}>
+                {allPlans.map(({ plan, isRec, price, mrp: planMrp, disc: d }) => (
+                  <div
+                    key={plan.name}
+                    style={{
+                      border: isRec ? `2px solid ${ac}` : "1px solid #e5e7eb",
+                      borderRadius: 8,
+                      padding: "12px 10px",
+                      background: isRec ? acbg : "#fff",
+                    }}
+                  >
+                    {isRec && (
+                      <div style={{ display: "inline-block", background: ac, color: "#fff", fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 999, marginBottom: 6 }}>
+                        ⭐ Recommended
+                      </div>
+                    )}
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", marginBottom: 2 }}>{plan.name}</div>
+                    <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>{plan.description}</div>
+                    {isRec && d > 0 && <div style={{ textDecoration: "line-through", color: "#9ca3af", fontSize: 11 }}>{formatINR(planMrp)}</div>}
+                    <div style={{ fontSize: 15, fontWeight: 800, color: isRec ? ac : "#374151", marginBottom: 2 }}>{formatINR(price)}</div>
+                    {plan.billing && <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 8 }}>{billingLabel(plan.billing)}</div>}
+                    {(plan.features || []).map((f) => (
+                      <div key={f} style={{ fontSize: 11, color: isRec ? "#374151" : "#6b7280", padding: "2px 0" }}>
+                        <span style={{ color: isRec ? ac : "#9ca3af", fontWeight: 700, marginRight: 4 }}>✓</span>{f}
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>

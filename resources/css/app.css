@@ -882,6 +882,36 @@ kbd {
   font-size: 12px;
 }
 
+/* Showcase plan tags in Step 2 */
+.showcase-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #ecfdf5;
+  color: #0f6e56;
+  border: 1px solid #6ee7b7;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.showcase-tag-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+.showcase-tag-remove:hover {
+  color: #ef4444;
+}
+
 .pricing-layout {
   display: grid;
   grid-template-columns: 1fr 360px;

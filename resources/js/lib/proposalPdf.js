@@ -33,7 +33,14 @@ export function lineItemsFromProposal(proposal) {
   if (!proposal?.lineItemsSnapshot?.length) return null;
   return proposal.lineItemsSnapshot.map((s) => ({
     product: { name: s.productName, color: s.productColor, id: s.productName },
-    plan: { name: s.planName, description: s.planDescription, features: s.features || [] },
+    plan: { name: s.planName, description: s.planDescription, features: s.features || [], billing: s.billing || null },
+    showcasePlans: (s.showcasePlans || []).map((p) => ({
+      name: p.planName,
+      description: p.planDescription,
+      features: p.features || [],
+      billing: p.billing || null,
+      mrp: p.mrp,
+    })),
     mrp: s.mrp,
     repDiscount: s.repDiscount,
     frequencyDiscount: s.frequencyDiscount || 0,
@@ -133,72 +140,143 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
   // ── PRODUCTS ─────────────────────────────────────────────
   if (lineItems && lineItems.length > 0) {
     need(20);
-    txt("Products Included", M, y, { size: 12, bold: true });
+    txt("Products Offered", M, y, { size: 12, bold: true });
     y += 18;
 
     lineItems.forEach((item) => {
-      const features = item.plan.features || [];
-      const cardH = 46 + features.length * 14 + 8;
-      need(cardH + 8);
+      const showcase = item.showcasePlans || [];
+      const hasComparison = showcase.length > 0;
 
-      doc.setFillColor("#f9fafb");
-      doc.setDrawColor("#e5e7eb");
-      doc.setLineWidth(0.5);
-      doc.rect(M, y, CW, cardH, "FD");
-      doc.setFillColor(item.product.color || ac);
-      doc.rect(M, y, 4, cardH, "F");
+      if (!hasComparison) {
+        // ── Single plan card (existing layout) ──
+        const features = item.plan.features || [];
+        const cardH = 46 + features.length * 14 + 8;
+        need(cardH + 8);
 
-      const iX = M + 16;
+        doc.setFillColor("#f9fafb");
+        doc.setDrawColor("#e5e7eb");
+        doc.setLineWidth(0.5);
+        doc.rect(M, y, CW, cardH, "FD");
+        doc.setFillColor(item.product.color || ac);
+        doc.rect(M, y, 4, cardH, "F");
 
-      // Product name
-      txt(item.product.name, iX, y + 16, { size: 11, bold: true });
+        const iX = M + 16;
+        txt(item.product.name, iX, y + 16, { size: 11, bold: true });
 
-      // Plan badge — placed right of name
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(11);
-      const nameW = doc.getTextWidth(item.product.name);
-      const badgeLabel = item.plan.name;
-      const badgeX = iX + nameW + 8;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(8);
-      const badgeW = doc.getTextWidth(badgeLabel) + 8;
-      doc.setFillColor(acbadge);
-      doc.rect(badgeX, y + 6, badgeW, 13, "F");
-      txt(badgeLabel, badgeX + 4, y + 15.5, { size: 8, bold: true, color: acd });
-
-      // Price right-aligned
-      txt(inr(item.final), pw - M - 12, y + 16, { size: 11, bold: true, color: ac, align: "right" });
-
-      // Per-item billing label
-      const itemBillingLabel = (() => {
-        const b = item.plan?.billing;
-        if (!b) return "";
-        if (b === "monthly") return "per month";
-        if (b === "annual") return "per year";
-        if (b === "one-time") return "one-time";
-        return b;
-      })();
-      if (itemBillingLabel) {
-        txt(itemBillingLabel, pw - M - 12, y + 29, { size: 7.5, color: CMU, align: "right" });
-      }
-
-      // Plan description
-      txt(item.plan.description, iX, y + 30, { size: 8.5, color: CL });
-
-      // Features with checkmarks
-      let fY = y + 44;
-      features.forEach((feat) => {
-        doc.setFillColor(ac);
-        doc.rect(iX, fY - 7, 7, 7, "F");
-        doc.setTextColor("#ffffff");
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(6.5);
-        doc.text("✓", iX + 1, fY - 1);
-        txt(feat, iX + 11, fY, { size: 8.5, color: CM });
-        fY += 14;
-      });
+        doc.setFontSize(11);
+        const nameW = doc.getTextWidth(item.product.name);
+        const badgeLabel = item.plan.name;
+        const badgeX = iX + nameW + 8;
+        doc.setFontSize(8);
+        const badgeW = doc.getTextWidth(badgeLabel) + 8;
+        doc.setFillColor(acbadge);
+        doc.rect(badgeX, y + 6, badgeW, 13, "F");
+        txt(badgeLabel, badgeX + 4, y + 15.5, { size: 8, bold: true, color: acd });
 
-      y += cardH + 8;
+        txt(inr(item.final), pw - M - 12, y + 16, { size: 11, bold: true, color: ac, align: "right" });
+
+        const bl = (() => {
+          const b = item.plan?.billing;
+          if (!b) return "";
+          if (b === "monthly") return "per month";
+          if (b === "annual") return "per year";
+          if (b === "one-time") return "one-time";
+          return b;
+        })();
+        if (bl) txt(bl, pw - M - 12, y + 29, { size: 7.5, color: CMU, align: "right" });
+
+        txt(item.plan.description, iX, y + 30, { size: 8.5, color: CL });
+
+        let fY = y + 44;
+        features.forEach((feat) => {
+          doc.setFillColor(ac);
+          doc.rect(iX, fY - 7, 7, 7, "F");
+          doc.setTextColor("#ffffff");
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(6.5);
+          doc.text("✓", iX + 1, fY - 1);
+          txt(feat, iX + 11, fY, { size: 8.5, color: CM });
+          fY += 14;
+        });
+
+        y += cardH + 8;
+      } else {
+        // ── Comparison card — recommended + showcase columns ──
+        const allPlans = [
+          { plan: item.plan, isRec: true, price: item.final, disc: item.repDiscount + (item.frequencyDiscount || 0) },
+          ...showcase.map((p) => ({ plan: p, isRec: false, price: p.mrp, disc: 0 })),
+        ];
+        const numCols = allPlans.length;
+        const colW2 = Math.floor((CW - 16) / numCols);
+        const maxFeatures = Math.max(...allPlans.map((a) => (a.plan.features || []).length));
+        const headerH = 40;
+        const compCardH = headerH + 10 + maxFeatures * 13 + 16;
+        need(compCardH + 24);
+
+        // Product header bar
+        doc.setFillColor("#f9fafb");
+        doc.setDrawColor("#e5e7eb");
+        doc.setLineWidth(0.5);
+        doc.rect(M, y, CW, headerH, "FD");
+        doc.setFillColor(item.product.color || ac);
+        doc.rect(M, y, 4, headerH, "F");
+        txt(item.product.name, M + 14, y + 14, { size: 11, bold: true });
+        txt("Choose the plan that works for you", M + 14, y + 28, { size: 8.5, color: CL });
+        y += headerH + 6;
+
+        // Plan columns
+        allPlans.forEach(({ plan, isRec, price, disc }, ci) => {
+          const cx = M + ci * (colW2 + 5);
+          const cy = y;
+
+          doc.setFillColor(isRec ? acbg : "#fff");
+          doc.setDrawColor(isRec ? ac : "#e5e7eb");
+          doc.setLineWidth(isRec ? 1.5 : 0.5);
+          doc.rect(cx, cy, colW2, compCardH, "FD");
+
+          let ry = cy + 12;
+
+          // Recommended badge
+          if (isRec) {
+            doc.setFillColor(ac);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(7);
+            const recW = doc.getTextWidth("Recommended") + 8;
+            doc.rect(cx + 6, ry - 8, recW, 11, "F");
+            doc.setTextColor("#ffffff");
+            doc.text("Recommended", cx + 10, ry - 0.5);
+            ry += 8;
+          }
+
+          txt(plan.name, cx + 6, ry + 2, { size: 9, bold: true, color: CD, maxWidth: colW2 - 12 });
+          ry += 13;
+
+          // Price
+          if (isRec && disc > 0) {
+            txt(inr(item.mrp), cx + 6, ry, { size: 7.5, color: CMU, maxWidth: colW2 - 12 });
+            ry += 10;
+          }
+          txt(inr(price), cx + 6, ry, { size: 9.5, bold: true, color: isRec ? ac : CD, maxWidth: colW2 - 12 });
+          ry += 11;
+
+          const bl = plan.billing === "monthly" ? "/mo" : plan.billing === "annual" ? "/yr" : plan.billing === "one-time" ? "once" : "";
+          if (bl) { txt(bl, cx + 6, ry, { size: 7, color: CMU }); ry += 10; }
+          else ry += 4;
+
+          // Features
+          (plan.features || []).forEach((feat) => {
+            const flines = doc.splitTextToSize(`✓ ${feat}`, colW2 - 12);
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(7.5);
+            doc.setTextColor(isRec ? CM : CL);
+            doc.text(flines, cx + 6, ry);
+            ry += flines.length * 10;
+          });
+        });
+
+        y += compCardH + 12;
+      }
     });
 
     // ── PRICING TABLE ─────────────────────────────────────

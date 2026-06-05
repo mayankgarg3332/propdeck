@@ -61,6 +61,13 @@ export function lineItemsFromSnapshot(proposal) {
       features: s.features || [],
       billing: s.billing || null,
     },
+    showcasePlans: (s.showcasePlans || []).map((p) => ({
+      name: p.planName,
+      description: p.planDescription,
+      features: p.features || [],
+      billing: p.billing || null,
+      mrp: p.mrp,
+    })),
     mrp: s.mrp,
     repDiscount: s.repDiscount,
     frequencyDiscount: s.frequencyDiscount || 0,
@@ -140,13 +147,18 @@ export function buildProposalHtmlEmail({
   if (lineItems && lineItems.length > 0) {
     const productCards = lineItems.map((item) => {
       const disc = item.repDiscount + (item.frequencyDiscount || 0);
-      const mrpHtml = disc > 0
-        ? `<span style="text-decoration:line-through;color:#9ca3af;font-size:12px;margin-right:4px;">${inr(item.mrp)}</span>`
-        : "";
-      const features = (item.plan.features || []).map((f) =>
-        `<div style="padding:2px 0;font-size:12px;color:#374151;"><span style="color:${ac};font-weight:700;margin-right:5px;">✓</span>${f}</div>`
-      ).join("");
-      return `
+      const showcase = item.showcasePlans || [];
+      const hasComparison = showcase.length > 0;
+
+      if (!hasComparison) {
+        // Single plan card — same as before
+        const mrpHtml = disc > 0
+          ? `<span style="text-decoration:line-through;color:#9ca3af;font-size:12px;margin-right:4px;">${inr(item.mrp)}</span>`
+          : "";
+        const features = (item.plan.features || []).map((f) =>
+          `<div style="padding:2px 0;font-size:12px;color:#374151;"><span style="color:${ac};font-weight:700;margin-right:5px;">✓</span>${f}</div>`
+        ).join("");
+        return `
 <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:12px;">
   <div style="border-left:4px solid ${item.product.color || ac};padding:14px 16px;background:#fafafa;">
     <table style="width:100%;border-collapse:collapse;"><tr>
@@ -161,6 +173,45 @@ export function buildProposalHtmlEmail({
     </tr></table>
   </div>
   <div style="padding:10px 16px 12px;background:#fff;">${features}</div>
+</div>`;
+      }
+
+      // Comparison card — recommended + showcase plans side by side
+      const allPlans = [
+        { plan: item.plan, isRecommended: true, finalPrice: item.final, disc },
+        ...showcase.map((p) => ({ plan: p, isRecommended: false, finalPrice: p.mrp, disc: 0 })),
+      ];
+      const colWidth = Math.floor(100 / allPlans.length);
+
+      const planCols = allPlans.map(({ plan, isRecommended, finalPrice, disc: d }) => {
+        const features = (plan.features || []).map((f) =>
+          `<div style="padding:2px 0;font-size:11px;color:${isRecommended ? "#374151" : "#6b7280"};">
+            <span style="color:${isRecommended ? ac : "#9ca3af"};font-weight:700;margin-right:4px;">✓</span>${f}
+          </div>`
+        ).join("");
+        const mrpLine = isRecommended && d > 0
+          ? `<div style="text-decoration:line-through;color:#9ca3af;font-size:11px;">${inr(item.mrp)}</div>`
+          : "";
+        return `<td style="width:${colWidth}%;padding:12px 10px;vertical-align:top;border:${isRecommended ? `2px solid ${ac}` : "1px solid #e5e7eb"};border-radius:8px;background:${isRecommended ? acbg : "#fff"};">
+          ${isRecommended ? `<div style="display:inline-block;background:${ac};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;margin-bottom:6px;">⭐ Recommended</div>` : ""}
+          <div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:2px;">${plan.name}</div>
+          <div style="font-size:11px;color:#6b7280;margin-bottom:8px;">${plan.description}</div>
+          ${mrpLine}
+          <div style="font-size:15px;font-weight:800;color:${isRecommended ? ac : "#374151"};margin-bottom:2px;">${inr(finalPrice)}</div>
+          ${plan.billing ? `<div style="font-size:10px;color:#9ca3af;margin-bottom:8px;">${billingLabel(plan.billing)}</div>` : "<div style='margin-bottom:8px;'></div>"}
+          ${features}
+        </td>`;
+      }).join(`<td style="width:8px;"></td>`);
+
+      return `
+<div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:12px;">
+  <div style="border-left:4px solid ${item.product.color || ac};padding:12px 16px;background:#fafafa;">
+    <span style="font-size:15px;font-weight:700;color:#111827;">${item.product.name}</span>
+    <div style="font-size:11px;color:#6b7280;margin-top:2px;">Choose the plan that works for you</div>
+  </div>
+  <div style="padding:12px 14px;background:#fff;">
+    <table style="width:100%;border-collapse:separate;border-spacing:0;"><tr>${planCols}</tr></table>
+  </div>
 </div>`;
     }).join("");
 

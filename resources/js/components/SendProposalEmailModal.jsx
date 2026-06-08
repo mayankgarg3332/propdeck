@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ExternalLink, Mail, Send, X } from "lucide-react";
 import { api } from "../services/api.js";
 import { isSmtpConfigured } from "../lib/emailConfig.js";
+import { CcTagInput } from "../pages/settings/SettingsPage.jsx";
 
 export function SendProposalEmailModal({
   title = "Send proposal",
@@ -19,7 +20,11 @@ export function SendProposalEmailModal({
   const smtpReady = isSmtpConfigured(settings?.email);
   const fromLabel = settings?.email?.fromEmail || settings?.email?.smtpUser || "";
 
+  // Pre-populate CC from settings default CC
+  const defaultCc = Array.isArray(settings?.email?.defaultCc) ? settings.email.defaultCc : [];
+
   const [toEmail, setToEmail] = useState(initialTo);
+  const [ccEmails, setCcEmails] = useState(defaultCc);
   const [subject, setSubject] = useState(initialSubject);
   const [status, setStatus] = useState("idle"); // idle | sending | gmail | sent | error
   const [error, setError] = useState("");
@@ -27,6 +32,9 @@ export function SendProposalEmailModal({
   const isMac = typeof navigator !== "undefined" && navigator.platform.toUpperCase().includes("MAC");
   const pasteShortcut = isMac ? "⌘V" : "Ctrl+V";
   const busy = status === "sending" || status === "gmail";
+
+  // CC filtered to exclude the To address (edge case guard)
+  const validCc = ccEmails.filter((e) => e !== toEmail.trim());
 
   const resolveProposalId = async () => {
     if (!onBeforeSend) return proposalId;
@@ -41,6 +49,7 @@ export function SendProposalEmailModal({
       const idForSend = await resolveProposalId();
       await api.sendProposalEmail({
         to: toEmail.trim(),
+        cc: validCc,
         subject: subject.trim(),
         htmlBody,
         proposalId: idForSend,
@@ -106,6 +115,29 @@ export function SendProposalEmailModal({
               disabled={busy}
             />
           </label>
+
+          <div>
+            <span className="field-label">CC <span style={{ fontWeight: 400, color: "#9ca3af" }}>(optional)</span></span>
+            <div style={{ marginTop: 4 }}>
+              <CcTagInput
+                emails={ccEmails}
+                onChange={busy ? null : setCcEmails}
+                readOnly={busy}
+                placeholder="Add email and press Enter..."
+              />
+            </div>
+            {validCc.length > 0 && (
+              <div className="field-hint" style={{ marginTop: 4 }}>
+                {validCc.length} CC address{validCc.length > 1 ? "es" : ""} · applied via SMTP only
+              </div>
+            )}
+            {ccEmails.some((e) => e === toEmail.trim()) && (
+              <div className="field-hint" style={{ marginTop: 4, color: "#f59e0b" }}>
+                ⚠ One address matches To — it will be skipped from CC.
+              </div>
+            )}
+          </div>
+
           <label>
             <span className="field-label">Subject</span>
             <input
@@ -115,6 +147,7 @@ export function SendProposalEmailModal({
               disabled={busy}
             />
           </label>
+
           {smtpReady && fromLabel && (
             <div className="smtp-from-banner">
               SMTP sends from <strong>{settings.email.fromName ? `${settings.email.fromName} ` : ""}</strong>
@@ -127,6 +160,9 @@ export function SendProposalEmailModal({
           <div className="smtp-send-note">
             <strong>Send email</strong> delivers the proposal from your SMTP settings.
             <strong> Open Gmail &amp; Paste</strong> opens Gmail with the proposal copied — paste with {pasteShortcut} in the compose window.
+            {validCc.length > 0 && (
+              <span> CC addresses are applied when using <strong>Send email</strong>. Add them manually in Gmail if using that path.</span>
+            )}
           </div>
         )}
 

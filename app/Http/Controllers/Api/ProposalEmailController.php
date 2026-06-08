@@ -20,10 +20,12 @@ class ProposalEmailController extends Controller
         $this->authorizeSection($request, 'proposals', 'write');
 
         $data = $request->validate([
-            'to' => 'required|email|max:255',
-            'subject' => 'required|string|max:255',
-            'htmlBody' => 'required|string|max:500000',
+            'to'         => 'required|email|max:255',
+            'subject'    => 'required|string|max:255',
+            'htmlBody'   => 'required|string|max:500000',
             'proposalId' => 'nullable|string|max:64',
+            'cc'         => 'nullable|array|max:20',
+            'cc.*'       => 'email|max:255',
         ]);
 
         $user = $this->currentUser($request);
@@ -36,7 +38,8 @@ class ProposalEmailController extends Controller
         $emailConfig = $effectiveSettings?->email;
 
         try {
-            AccountMailer::send($emailConfig, $data['to'], $data['subject'], $data['htmlBody']);
+            $cc = array_values(array_filter($data['cc'] ?? [], fn ($addr) => $addr !== $data['to']));
+            AccountMailer::send($emailConfig, $data['to'], $data['subject'], $data['htmlBody'], $cc);
         } catch (InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }

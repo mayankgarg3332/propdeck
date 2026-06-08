@@ -2027,3 +2027,74 @@ kbd {
   font-size: 13px;
   font-weight: 600;
 }
+
+/* ── CC Tag Input ───────────────────────────────────────────── */
+.cc-tag-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  cursor: text;
+  transition: border-color 0.15s;
+}
+
+.cc-tag-input:focus-within {
+  border-color: #1d9e75;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(29, 158, 117, 0.12);
+}
+
+.cc-tag-input.readonly {
+  background: #f9fafb;
+  cursor: default;
+}
+
+.cc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+  border-radius: 999px;
+  padding: 2px 10px 2px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.cc-chip-remove {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  line-height: 1;
+  border-radius: 999px;
+}
+
+.cc-chip-remove:hover {
+  color: #ef4444;
+}
+
+.cc-tag-input-field {
+  flex: 1;
+  min-width: 180px;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  background: transparent;
+  color: #111827;
+  padding: 2px 0;
+}
+
+.cc-tag-input-field::placeholder {
+  color: #9ca3af;
+}

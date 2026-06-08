@@ -24,7 +24,7 @@ class AccountMailer
     /**
      * @throws InvalidArgumentException
      */
-    public static function send(?array $email, string $to, string $subject, string $html): void
+    public static function send(?array $email, string $to, string $subject, string $html, array $cc = []): void
     {
         if (! self::isConfigured($email)) {
             throw new InvalidArgumentException(
@@ -57,7 +57,7 @@ class AccountMailer
         try {
             Mail::mailer('account_smtp')
                 ->to($to)
-                ->send(new ProposalHtmlMail($subject, $html, $fromAddress, $fromName));
+                ->send(new ProposalHtmlMail($subject, $html, $fromAddress, $fromName, $cc));
         } catch (TransportExceptionInterface $e) {
             throw new InvalidArgumentException(
                 'Could not send email. Check SMTP host, port, username, password, and encryption in Settings.',

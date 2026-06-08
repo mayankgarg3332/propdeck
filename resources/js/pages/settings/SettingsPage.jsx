@@ -393,6 +393,18 @@ function EmailTab({ form, onChange, readOnly }) {
           />
           <span className="field-hint">Use {"{{id}}"} for proposal number, {"{{agency}}"} for agency name</span>
         </label>
+        <div className="span-2">
+          <span className="field-label">Default CC</span>
+          <span className="field-hint" style={{ display: "block", marginBottom: 8 }}>
+            These addresses are pre-filled in every proposal's CC field. Senders can remove them per send.
+          </span>
+          <CcTagInput
+            emails={form.defaultCc || []}
+            onChange={readOnly ? null : (val) => onChange("defaultCc", val)}
+            readOnly={readOnly}
+            placeholder="Add email and press Enter..."
+          />
+        </div>
       </div>
       <div className="modal-note" style={{ marginTop: 16 }}>
         For Gmail, use an app password with host <strong>smtp.gmail.com</strong>, port <strong>587</strong>, and encryption <strong>TLS</strong>.
@@ -563,6 +575,83 @@ function DefaultsTab({ form, onChange, newKyc, setNewKyc, onAddKyc, onKycKey, on
         />
         <span className="field-hint">One term per line. Numbered automatically in proposals.</span>
       </label>
+    </div>
+  );
+}
+
+/**
+ * Reusable CC tag-input component.
+ * Used in Settings → Email Config (default CC) and in SendProposalEmailModal.
+ */
+export function CcTagInput({ emails, onChange, readOnly = false, placeholder = "Add email and press Enter..." }) {
+  const [inputVal, setInputVal] = useState("");
+  const [inputError, setInputError] = useState("");
+
+  const isValidEmail = (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
+
+  const addEmail = (raw) => {
+    // Support comma-separated paste: split, validate each
+    const candidates = raw.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean);
+    const toAdd = [];
+    let hasError = false;
+
+    for (const candidate of candidates) {
+      if (!isValidEmail(candidate)) { hasError = true; continue; }
+      if (emails.includes(candidate)) continue; // duplicate — skip silently
+      toAdd.push(candidate);
+    }
+
+    if (toAdd.length > 0) onChange([...emails, ...toAdd]);
+    if (hasError) {
+      setInputError("One or more entries are not valid email addresses.");
+    } else {
+      setInputError("");
+    }
+    setInputVal("");
+  };
+
+  const removeEmail = (email) => onChange(emails.filter((e) => e !== email));
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
+      e.preventDefault();
+      if (inputVal.trim()) addEmail(inputVal);
+    }
+    if (e.key === "Backspace" && !inputVal && emails.length > 0) {
+      removeEmail(emails[emails.length - 1]);
+    }
+  };
+
+  const handleBlur = () => {
+    if (inputVal.trim()) addEmail(inputVal);
+  };
+
+  return (
+    <div>
+      <div className={`cc-tag-input ${readOnly ? "readonly" : ""}`}>
+        {emails.map((email) => (
+          <span key={email} className="cc-chip">
+            {email}
+            {!readOnly && (
+              <button type="button" className="cc-chip-remove" onClick={() => removeEmail(email)} aria-label={`Remove ${email}`}>
+                <X size={11} />
+              </button>
+            )}
+          </span>
+        ))}
+        {!readOnly && (
+          <input
+            className="cc-tag-input-field"
+            type="text"
+            value={inputVal}
+            onChange={(e) => { setInputVal(e.target.value); setInputError(""); }}
+            onKeyDown={handleKeyDown}
+            onBlur={handleBlur}
+            placeholder={emails.length === 0 ? placeholder : ""}
+          />
+        )}
+      </div>
+      {inputError && <div className="form-error" style={{ marginTop: 4, fontSize: 12 }}>{inputError}</div>}
     </div>
   );
 }

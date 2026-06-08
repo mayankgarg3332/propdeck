@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { FileText, IndianRupee, PlusCircle, CheckCircle2 } from "lucide-react";
-import { formatDate, formatDateTime, formatINR, getStatusStyle } from "../../lib/format.js";
+import { formatDate, formatDateTime, formatINR } from "../../lib/format.js";
+import { getStatusStyle, getStatusesByRole, getProposalStatuses } from "../../lib/proposalStatuses.js";
 import { downloadProposalPdf, lineItemsFromProposal, totalsFromProposal } from "../../lib/proposalPdf.js";
 import { generateUpiQr } from "../../lib/proposalEmail.js";
 import { ProposalDetailModal } from "../proposals/ProposalDetailModal.jsx";
@@ -19,7 +20,7 @@ function isSameMonth(dateStr, year, month) {
   return d.getFullYear() === year && d.getMonth() === month;
 }
 
-function computeStats(proposals) {
+function computeStats(proposals, settings) {
   const now = new Date();
   const thisYear = now.getFullYear();
   const thisMonth = now.getMonth();
@@ -30,7 +31,11 @@ function computeStats(proposals) {
   const lastMonthProposals = proposals.filter((p) => isSameMonth(p.date, lastMonthYear, lastMonth));
   const delta = thisMonthProposals.length - lastMonthProposals.length;
 
-  const accepted = proposals.filter((p) => p.status === "Accepted");
+  // Use role-based counting so renamed/custom "positive" statuses are included
+  const positiveValues = new Set(getStatusesByRole(settings, "positive").map((s) => s.value));
+  const accepted = proposals.filter((p) => positiveValues.has(p.status));
+  const positiveLabel = getStatusesByRole(settings, "positive").map((s) => s.label).join(" / ") || "Accepted";
+
   const acceptanceRate = proposals.length > 0 ? Math.round((accepted.length / proposals.length) * 100) : 0;
   const revenue = accepted.reduce((sum, p) => sum + p.amount, 0);
 
@@ -39,7 +44,7 @@ function computeStats(proposals) {
     delta > 0 ? `+${delta} from last month` :
     `${delta} from last month`;
 
-  return { thisMonthCount: thisMonthProposals.length, deltaLabel, accepted, acceptanceRate, revenue };
+  return { thisMonthCount: thisMonthProposals.length, deltaLabel, accepted, acceptanceRate, revenue, positiveLabel };
 }
 
 export function DashboardPage({ data, reload, navigate, openNewProposal }) {
@@ -47,7 +52,7 @@ export function DashboardPage({ data, reload, navigate, openNewProposal }) {
   const [viewingProposal, setViewingProposal] = useState(null);
   const [resendProposal, setResendProposal] = useState(null);
   const [upiQrDataUrl, setUpiQrDataUrl] = useState(null);
-  const { thisMonthCount, deltaLabel, accepted, acceptanceRate, revenue } = computeStats(data.proposals);
+  const { thisMonthCount, deltaLabel, accepted, acceptanceRate, revenue, positiveLabel } = computeStats(data.proposals, data.settings);
 
   const upiId = data.settings?.payment?.upi || "";
   const companyName = data.settings?.company?.name || "";
@@ -57,8 +62,8 @@ export function DashboardPage({ data, reload, navigate, openNewProposal }) {
 
   const stats = [
     { label: "Proposals this month", value: String(thisMonthCount), sub: deltaLabel, icon: FileText },
-    { label: "Accepted proposals", value: String(accepted.length), sub: `${acceptanceRate}% acceptance rate`, icon: CheckCircle2 },
-    { label: "Revenue committed", value: formatINR(revenue), sub: "From accepted proposals", icon: IndianRupee },
+    { label: `${positiveLabel} proposals`, value: String(accepted.length), sub: `${acceptanceRate}% acceptance rate`, icon: CheckCircle2 },
+    { label: "Revenue committed", value: formatINR(revenue), sub: `From ${positiveLabel.toLowerCase()} proposals`, icon: IndianRupee },
   ];
 
   return (
@@ -201,7 +206,7 @@ export function ProposalRows({ data, limit, editableStatuses, onStatusChange, on
       </thead>
       <tbody>
         {rows.map((proposal) => {
-          const style = getStatusStyle(proposal.status);
+          const style = getStatusStyle(proposal.status, data.settings);
           const creatorName = showSentBy
             ? resolveCreatorName(proposal.createdByUserId, teamMembers, null)
             : null;
@@ -223,8 +228,8 @@ export function ProposalRows({ data, limit, editableStatuses, onStatusChange, on
                     value={proposal.status}
                     onChange={(event) => onStatusChange(proposal, event.target.value)}
                   >
-                    {editableStatuses.map((status) => (
-                      <option key={status} value={status}>{status}</option>
+                    {(editableStatuses || []).map((s) => (
+                      <option key={s.value ?? s} value={s.value ?? s}>{s.label ?? s}</option>
                     ))}
                   </select>
                 ) : (

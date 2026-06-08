@@ -4,6 +4,13 @@ import { api } from "../../services/api.js";
 import { usePermissions } from "../../hooks/usePermissions.js";
 import { COMPANY_LIMITED_WRITE_FIELDS } from "../../lib/permissions.js";
 import { DEFAULT_BILLING_TYPES } from "../../lib/billingTypes.js";
+import {
+  DEFAULT_PROPOSAL_STATUSES,
+  STATUS_ROLES,
+  COLOR_PRESETS,
+  validateStatuses,
+  slugifyStatusLabel,
+} from "../../lib/proposalStatuses.js";
 
 const TABS = [
   { id: "company", label: "Company Info" },
@@ -50,6 +57,7 @@ export function SettingsPage({ data, reload }) {
     kyc: [...(s.defaults?.kyc || [])],
     terms: [...(s.defaults?.terms || [])],
     billingTypes: [...(s.defaults?.billingTypes || DEFAULT_BILLING_TYPES)],
+    proposalStatuses: [...(s.defaults?.proposalStatuses || DEFAULT_PROPOSAL_STATUSES)],
   });
   const [newKyc, setNewKyc] = useState("");
 
@@ -71,6 +79,7 @@ export function SettingsPage({ data, reload }) {
       kyc: [...(s.defaults?.kyc || [])],
       terms: [...(s.defaults?.terms || [])],
       billingTypes: [...(s.defaults?.billingTypes || DEFAULT_BILLING_TYPES)],
+      proposalStatuses: [...(s.defaults?.proposalStatuses || DEFAULT_PROPOSAL_STATUSES)],
     });
     setSaveState("idle");
     setSaveError("");
@@ -93,6 +102,7 @@ export function SettingsPage({ data, reload }) {
       kyc: [...(s.defaults?.kyc || [])],
       terms: [...(s.defaults?.terms || [])],
       billingTypes: [...(s.defaults?.billingTypes || DEFAULT_BILLING_TYPES)],
+      proposalStatuses: [...(s.defaults?.proposalStatuses || DEFAULT_PROPOSAL_STATUSES)],
     },
   }), [s.company, s.payment, s.email, s.defaults]);
 
@@ -314,6 +324,7 @@ export function SettingsPage({ data, reload }) {
             onKycKey={handleKycKey}
             onRemoveKyc={removeKyc}
             readOnly={!canWriteSettingsTab("defaults")}
+            proposals={data.proposals || []}
           />
         )}
       </div>
@@ -551,7 +562,7 @@ function EmailTab({ form, onChange, readOnly }) {
   );
 }
 
-function DefaultsTab({ form, onChange, newKyc, setNewKyc, onAddKyc, onKycKey, onRemoveKyc, readOnly }) {
+function DefaultsTab({ form, onChange, newKyc, setNewKyc, onAddKyc, onKycKey, onRemoveKyc, readOnly, proposals = [] }) {
   const termsText = (form.terms || []).join("\n");
   const billingTypes = form.billingTypes || DEFAULT_BILLING_TYPES;
 
@@ -614,6 +625,14 @@ function DefaultsTab({ form, onChange, newKyc, setNewKyc, onAddKyc, onKycKey, on
         />
         <span className="field-hint">New proposals start from this number (auto-skips taken ones)</span>
       </div>
+
+      {/* ── Proposal Statuses ────────────────────────────── */}
+      <ProposalStatusesSection
+        form={form}
+        onChange={onChange}
+        readOnly={readOnly}
+        proposals={proposals}
+      />
 
       {/* ── Billing Types ─────────────────────────────────── */}
       <div className="span-2">
@@ -789,6 +808,167 @@ export function CcTagInput({ emails, onChange, readOnly = false, placeholder = "
         )}
       </div>
       {inputError && <div className="form-error" style={{ marginTop: 4, fontSize: 12 }}>{inputError}</div>}
+    </div>
+  );
+}
+
+function ProposalStatusesSection({ form, onChange, readOnly, proposals = [] }) {
+  const statuses = form.proposalStatuses || DEFAULT_PROPOSAL_STATUSES;
+  const [statusErrors, setStatusErrors] = useState([]);
+
+  // Count proposals using each status value
+  const usageCount = {};
+  proposals.forEach((p) => {
+    if (p.status) usageCount[p.status] = (usageCount[p.status] || 0) + 1;
+  });
+
+  const updateStatus = (index, field, value) => {
+    const updated = statuses.map((s, i) => i === index ? { ...s, [field]: value } : s);
+    const errors = validateStatuses(updated);
+    setStatusErrors(errors);
+    onChange("proposalStatuses", updated);
+  };
+
+  const addStatus = () => {
+    const newStatus = {
+      value: `status_${Date.now()}`,
+      label: "New Status",
+      color: COLOR_PRESETS[0].bg,
+      textColor: COLOR_PRESETS[0].text,
+      role: "neutral",
+    };
+    onChange("proposalStatuses", [...statuses, newStatus]);
+  };
+
+  const removeStatus = (index) => {
+    const s = statuses[index];
+    if (usageCount[s.value] > 0) return; // guard — in-use
+    const updated = statuses.filter((_, i) => i !== index);
+    const errors = validateStatuses(updated);
+    setStatusErrors(errors);
+    onChange("proposalStatuses", updated);
+  };
+
+  const canRemove = (s, index) => {
+    if (readOnly) return false;
+    if (usageCount[s.value] > 0) return false; // has proposals
+    // Can't remove if it's the only status of a required role
+    const roleCount = statuses.filter((x) => x.role === s.role).length;
+    if (s.role === "initial" && roleCount <= 1) return false;
+    if (s.role === "sent"    && roleCount <= 1) return false;
+    if (s.role === "positive" && roleCount <= 1) return false;
+    return true;
+  };
+
+  return (
+    <div className="span-2">
+      <span className="field-label">Proposal Statuses</span>
+      <span className="field-hint" style={{ display: "block", marginBottom: 10 }}>
+        Customise the statuses available on proposals. <strong>Role</strong> drives business logic — keep exactly one <em>Initial</em> and one <em>Sent</em> role. Statuses in use by proposals cannot be deleted.
+      </span>
+
+      {statusErrors.length > 0 && (
+        <div className="form-error" style={{ marginBottom: 10 }}>
+          {statusErrors.map((e, i) => <div key={i}>{e}</div>)}
+        </div>
+      )}
+
+      <div className="proposal-statuses-table">
+        <div className="proposal-statuses-header">
+          <span>Preview</span>
+          <span>Label</span>
+          <span>Color</span>
+          <span>Role</span>
+          <span>In use</span>
+          {!readOnly && <span></span>}
+        </div>
+
+        {statuses.map((s, i) => {
+          const count = usageCount[s.value] || 0;
+          const deletable = canRemove(s, i);
+          return (
+            <div className="proposal-statuses-row" key={s.value + i}>
+              {/* Preview pill */}
+              <div>
+                <span className="status-pill" style={{ background: s.color, color: s.textColor, padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>
+                  {s.label || "…"}
+                </span>
+              </div>
+
+              {/* Label */}
+              <input
+                className="input"
+                value={s.label}
+                placeholder="Label"
+                readOnly={readOnly}
+                onChange={readOnly ? undefined : (e) => updateStatus(i, "label", e.target.value)}
+              />
+
+              {/* Color preset picker */}
+              <div className="color-preset-row">
+                {COLOR_PRESETS.map((preset) => (
+                  <button
+                    key={preset.bg}
+                    type="button"
+                    className={`color-preset-swatch ${s.color === preset.bg ? "selected" : ""}`}
+                    style={{ background: preset.bg, border: `2px solid ${s.color === preset.bg ? preset.text : "transparent"}` }}
+                    title={preset.label}
+                    disabled={readOnly}
+                    onClick={readOnly ? undefined : () => {
+                      const updated = statuses.map((st, idx) => idx === i ? { ...st, color: preset.bg, textColor: preset.text } : st);
+                      onChange("proposalStatuses", updated);
+                    }}
+                  />
+                ))}
+              </div>
+
+              {/* Role */}
+              <select
+                className="select"
+                value={s.role}
+                disabled={readOnly}
+                onChange={readOnly ? undefined : (e) => updateStatus(i, "role", e.target.value)}
+              >
+                {STATUS_ROLES.map((r) => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+
+              {/* In-use count */}
+              <span style={{ fontSize: 12, color: count > 0 ? "#374151" : "#9ca3af", fontWeight: count > 0 ? 600 : 400 }}>
+                {count > 0 ? `${count} proposal${count > 1 ? "s" : ""}` : "—"}
+              </span>
+
+              {/* Delete */}
+              {!readOnly && (
+                <button
+                  className="kyc-remove"
+                  onClick={() => removeStatus(i)}
+                  disabled={!deletable}
+                  title={
+                    count > 0 ? `${count} proposal(s) use this status — cannot delete`
+                    : !deletable ? "Required role — cannot delete"
+                    : "Remove status"
+                  }
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+          );
+        })}
+
+        {!readOnly && (
+          <button
+            className="button"
+            style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6 }}
+            onClick={addStatus}
+            disabled={statuses.length >= 12}
+          >
+            <Plus size={14} /> Add status
+          </button>
+        )}
+      </div>
     </div>
   );
 }

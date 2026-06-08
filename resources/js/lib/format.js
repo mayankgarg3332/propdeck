@@ -43,14 +43,9 @@ export function formatDateTime(isoTimestamp) {
   return { date, time: `${hh}:${mm}` };
 }
 
-export function getStatusStyle(status) {
-  const map = {
-    Draft: { background: "#f3f4f6", color: "#6b7280" },
-    Sent: { background: "#eff6ff", color: "#2563eb" },
-    Accepted: { background: "#e1f5ee", color: "#0f6e56" },
-    Rejected: { background: "#fef2f2", color: "#dc2626" },
-    Expired: { background: "#fef2f2", color: "#dc2626" },
-    Revised: { background: "#fffbeb", color: "#d97706" },
-  };
-  return map[status] || map.Draft;
-}
+/**
+ * getStatusStyle is settings-aware. settings param is optional —
+ * callers not yet updated fall back to DEFAULT_PROPOSAL_STATUSES.
+ * Delegates to proposalStatuses.js which is the single source of truth.
+ */
+export { getStatusStyle } from "./proposalStatuses.js";

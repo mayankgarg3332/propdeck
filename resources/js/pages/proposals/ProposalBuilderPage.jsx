@@ -8,6 +8,7 @@ import { downloadProposalPdf } from "../../lib/proposalPdf.js";
 import { getProposalHeaderColor, headerSubtitleColor, buildProposalTheme } from "../../lib/proposalTheme.js";
 import { buildProposalHtmlEmail, generateUpiQr, renderExtrasHtml } from "../../lib/proposalEmail.js";
 import { billingLabel, getBillingTypes } from "../../lib/billingTypes.js";
+import { getStatusByRole } from "../../lib/proposalStatuses.js";
 
 const steps = ["Client Details", "Select Products", "Pricing", "Preview & Send"];
 
@@ -149,7 +150,7 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
 
     try {
       setSavingDraft(true);
-      await saveProposal("Draft");
+      await saveProposal(getStatusByRole(data.settings, "initial")?.value || "Draft");
       setSaved(true);
       setTimeout(() => {
         setSaved(false);
@@ -168,7 +169,7 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
         id: proposalId,
         products: buildProductLabels(),
         amount: totals.total,
-        status: "Draft",
+        status: getStatusByRole(data.settings, "initial")?.value || "Draft",
         date: new Date().toISOString().split("T")[0],
         extrasHeading: extrasHeading.trim(),
         extrasText: extrasText.trim(),
@@ -426,12 +427,12 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
           htmlBody={buildProposalHtmlEmail({ client, proposalId, lineItems, totals, paymentLink, frequency, extrasHeading: extrasHeading.trim(), extrasText: extrasText.trim(), settings: data.settings, rep: data.rep })}
           proposalId={proposalId}
           onBeforeSend={async () => {
-            const saved = await saveProposal("Draft");
+            const saved = await saveProposal(getStatusByRole(data.settings, "initial")?.value || "Draft");
             return { proposalId: saved?.id || proposalId };
           }}
           onSent={async (method) => {
             if (method === "gmail") {
-              await saveProposal("Sent");
+              await saveProposal(getStatusByRole(data.settings, "sent")?.value || "Sent");
             }
             setSendModalOpen(false);
             await reload();

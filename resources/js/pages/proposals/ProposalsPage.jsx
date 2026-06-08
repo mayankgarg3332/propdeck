@@ -2,18 +2,19 @@ import { useState, useEffect } from "react";
 import { api } from "../../services/api.js";
 import { downloadProposalPdf, lineItemsFromProposal, totalsFromProposal } from "../../lib/proposalPdf.js";
 import { generateUpiQr } from "../../lib/proposalEmail.js";
+import { getProposalStatuses } from "../../lib/proposalStatuses.js";
 import { ProposalRows } from "../dashboard/DashboardPage.jsx";
 import { ProposalDetailModal } from "./ProposalDetailModal.jsx";
 import { ResendEmailModal } from "./ResendEmailModal.jsx";
 import { usePermissions } from "../../hooks/usePermissions.js";
 
-const statuses = ["All", "Draft", "Sent", "Accepted", "Rejected", "Expired", "Revised"];
-const editableStatuses = statuses.filter((status) => status !== "All");
-
 export function ProposalsPage({ data, reload }) {
   const perms = usePermissions();
   const [status, setStatus] = useState("All");
   const [upiQrDataUrl, setUpiQrDataUrl] = useState(null);
+
+  // Resolve statuses from settings (falls back to defaults)
+  const configuredStatuses = getProposalStatuses(data.settings);
 
   const upiId = data.settings?.payment?.upi || "";
   const companyName = data.settings?.company?.name || "";
@@ -66,16 +67,19 @@ export function ProposalsPage({ data, reload }) {
         </div>
       </div>
       <div className="card filters">
-        {statuses.map((item) => (
-          <button className={item === status ? "active" : ""} key={item} onClick={() => setStatus(item)}>
-            {item}
+        <button className={"All" === status ? "active" : ""} onClick={() => setStatus("All")}>
+          All
+        </button>
+        {configuredStatuses.map((s) => (
+          <button className={s.value === status ? "active" : ""} key={s.value} onClick={() => setStatus(s.value)}>
+            {s.label}
           </button>
         ))}
       </div>
       <div className="card table-card">
         <ProposalRows
           data={filtered}
-          editableStatuses={editableStatuses}
+          editableStatuses={configuredStatuses}
           onStatusChange={perms.canWrite("proposals") ? updateProposalStatus : null}
           onDelete={perms.canWrite("proposals") ? setProposalToDelete : null}
           onView={setViewingProposal}

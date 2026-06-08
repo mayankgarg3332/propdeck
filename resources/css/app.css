@@ -2167,3 +2167,73 @@ kbd {
 .cc-tag-input-field::placeholder {
   color: #9ca3af;
 }
+
+/* ── Proposal Statuses Settings ──────────────────────────── */
+.proposal-statuses-table {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.proposal-statuses-header {
+  display: grid;
+  grid-template-columns: 110px 1fr 140px 1fr 80px 32px;
+  gap: 8px;
+  background: #f9fafb;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid #e5e7eb;
+  align-items: center;
+}
+
+.proposal-statuses-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 140px 1fr 80px 32px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.proposal-statuses-row:last-child {
+  border-bottom: none;
+}
+
+.proposal-statuses-row .input {
+  font-size: 13px;
+  padding: 6px 10px;
+}
+
+.color-preset-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.color-preset-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: transform 0.1s;
+}
+
+.color-preset-swatch:hover {
+  transform: scale(1.2);
+}
+
+.color-preset-swatch.selected {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px #374151;
+}
+
+.color-preset-swatch:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}

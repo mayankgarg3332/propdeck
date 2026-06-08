@@ -96,10 +96,10 @@ class AppSetting extends Model
             ['id' => $key],
             [
                 'user_id' => $userId,
-                'company' => null,
-                'payment' => null,
-                'email' => null,
-                'defaults' => null,
+                'company' => [],
+                'payment' => [],
+                'email' => [],
+                'defaults' => [],
             ],
         );
     }

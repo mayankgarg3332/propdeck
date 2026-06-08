@@ -46,6 +46,7 @@ trait ApiResponse
             'createdAt' => $proposal->created_at_custom?->toIso8601String()
                 ?? $proposal->created_at?->toIso8601String(),
             'updatedAt' => $proposal->updated_at?->toIso8601String(),
+            'createdByUserId' => $proposal->created_by_user_id,
         ];
     }
 
@@ -240,6 +241,21 @@ trait ApiResponse
         $settings = $this->mergeEffectiveSettings($accountSettings, $userSettings);
         $rep = Rep::where('user_id', $accountId)->first();
 
+        // Build teamMembers map (id → {name, email}) for the account owner only.
+        // Includes the owner + all sub-users so proposals can show who created them.
+        $teamMembers = null;
+        if ($user->isAccountOwner()) {
+            $owner = User::find($accountId);
+            $subUsers = User::where('parent_user_id', $accountId)->get();
+            $teamMembers = collect([$owner])
+                ->merge($subUsers)
+                ->filter()
+                ->mapWithKeys(fn (User $u) => [
+                    $u->id => ['name' => $u->name, 'email' => $u->email],
+                ])
+                ->all();
+        }
+
         return [
             'clients' => $clients->map(fn ($c) => $this->clientPayload($c))->values(),
             'products' => $products->map(fn ($p) => $this->productPayload($p))->values(),
@@ -249,6 +265,7 @@ trait ApiResponse
             'nextProposalId' => $this->nextProposalId($accountId, $settings),
             'permissions' => $user->permissionsPayload(),
             'isAccountOwner' => $user->isAccountOwner(),
+            'teamMembers' => $teamMembers,
         ];
     }
 

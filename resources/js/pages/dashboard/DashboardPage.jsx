@@ -150,6 +150,26 @@ export function DashboardPage({ data, reload, navigate, openNewProposal }) {
   );
 }
 
+/**
+ * Resolve a display name for who created a proposal.
+ *
+ * teamMembers: { [userId]: { name, email } } — only present for account owners
+ * createdByUserId: the user ID stored on the proposal
+ * currentUserId: the logged-in user's ID (to show "You" for own proposals)
+ *
+ * Edge cases:
+ *  - createdByUserId is null (old proposals before tracking was added) → "—"
+ *  - User has been deleted (id not in teamMembers) → "Deleted user"
+ *  - Created by the account owner themselves → owner's name
+ */
+function resolveCreatorName(createdByUserId, teamMembers, currentUserId) {
+  if (!createdByUserId) return null; // null = don't show (old proposals)
+  if (!teamMembers) return null;     // not account owner — don't show column
+  const member = teamMembers[createdByUserId];
+  if (!member) return "Deleted user";
+  return member.name || member.email || "Unknown";
+}
+
 export function ProposalRows({ data, limit, editableStatuses, onStatusChange, onDelete, onView, onPdf, onResend }) {
   const sortKey = (p) => p.createdAt || (p.date + "T00:00:00");
   const rows = [...data.proposals]
@@ -159,6 +179,11 @@ export function ProposalRows({ data, limit, editableStatuses, onStatusChange, on
     ...proposal,
     client: data.clients.find((client) => client.id === proposal.clientId),
   }));
+
+  // Show "Sent by" column only for account owners who have teamMembers data
+  // AND only when there are actually sub-users (more than 1 team member)
+  const teamMembers = data.teamMembers;
+  const showSentBy = Boolean(teamMembers && Object.keys(teamMembers).length > 1);
 
   return (
     <table className="table">
@@ -170,12 +195,17 @@ export function ProposalRows({ data, limit, editableStatuses, onStatusChange, on
           <th>Amount</th>
           <th>Status</th>
           <th>Date</th>
+          {showSentBy && <th>Sent by</th>}
           <th>Actions</th>
         </tr>
       </thead>
       <tbody>
         {rows.map((proposal) => {
           const style = getStatusStyle(proposal.status);
+          const creatorName = showSentBy
+            ? resolveCreatorName(proposal.createdByUserId, teamMembers, null)
+            : null;
+
           return (
             <tr key={proposal.id}>
               <td><strong className="proposal-id">{proposal.id}</strong></td>
@@ -209,6 +239,17 @@ export function ProposalRows({ data, limit, editableStatuses, onStatusChange, on
                   ) : formatDate(proposal.date);
                 })()}
               </td>
+              {showSentBy && (
+                <td className="muted">
+                  {creatorName ? (
+                    <span style={creatorName === "Deleted user" ? { color: "#9ca3af", fontStyle: "italic" } : {}}>
+                      {creatorName}
+                    </span>
+                  ) : (
+                    <span style={{ color: "#9ca3af" }}>—</span>
+                  )}
+                </td>
+              )}
               <td>
                 <div className="row-actions">
                   <button onClick={() => onView?.(proposal)}>View</button>

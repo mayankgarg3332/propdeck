@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Check, GripVertical, X, Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Check, GripVertical, Loader, X, Plus } from "lucide-react";
 import { api } from "../../services/api.js";
 import { usePermissions } from "../../hooks/usePermissions.js";
 import { COMPANY_LIMITED_WRITE_FIELDS } from "../../lib/permissions.js";
@@ -12,6 +12,20 @@ const TABS = [
   { id: "email", label: "Email Config" },
   { id: "defaults", label: "Defaults" },
 ];
+
+// Deep-equality check sufficient for settings (JSON-serialisable objects/arrays)
+function settingsEqual(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+// Build the clean snapshot used as the "saved" baseline for a given tab
+function tabSnapshot(tab, { company, payment, email, defaults }) {
+  if (tab === "company" || tab === "sales") return company;
+  if (tab === "payment") return payment;
+  if (tab === "email") return email;
+  if (tab === "defaults") return defaults;
+  return null;
+}
 
 export function SettingsPage({ data, reload }) {
   const {
@@ -37,15 +51,17 @@ export function SettingsPage({ data, reload }) {
     terms: [...(s.defaults?.terms || [])],
     billingTypes: [...(s.defaults?.billingTypes || DEFAULT_BILLING_TYPES)],
   });
-  const [saved, setSaved] = useState(false);
   const [newKyc, setNewKyc] = useState("");
 
-  useEffect(() => {
-    if (!visibleTabs.some((t) => t.id === tab)) {
-      setTab(visibleTabs[0]?.id || "company");
-    }
-  }, [visibleTabs, tab]);
+  // save state: "idle" | "saving" | "saved" | "error"
+  const [saveState, setSaveState] = useState("idle");
+  const [saveError, setSaveError] = useState("");
+  const savedTimerRef = useRef(null);
 
+  // Pending tab switch — when user clicks another tab while dirty
+  const [pendingTab, setPendingTab] = useState(null);
+
+  // Reset forms when server data changes (after reload)
   useEffect(() => {
     setCompany({ ...(s.company || {}) });
     setPayment({ ...(s.payment || {}) });
@@ -54,16 +70,59 @@ export function SettingsPage({ data, reload }) {
       ...(s.defaults || {}),
       kyc: [...(s.defaults?.kyc || [])],
       terms: [...(s.defaults?.terms || [])],
+      billingTypes: [...(s.defaults?.billingTypes || DEFAULT_BILLING_TYPES)],
     });
+    setSaveState("idle");
+    setSaveError("");
   }, [s.company, s.payment, s.email, s.defaults]);
+
+  // Keep tab in sync with visible tabs
+  useEffect(() => {
+    if (!visibleTabs.some((t) => t.id === tab)) {
+      setTab(visibleTabs[0]?.id || "company");
+    }
+  }, [visibleTabs, tab]);
+
+  // ── Dirty detection ─────────────────────────────────────────
+  const savedValues = useMemo(() => ({
+    company: s.company || {},
+    payment: s.payment || {},
+    email: s.email || {},
+    defaults: {
+      ...(s.defaults || {}),
+      kyc: [...(s.defaults?.kyc || [])],
+      terms: [...(s.defaults?.terms || [])],
+      billingTypes: [...(s.defaults?.billingTypes || DEFAULT_BILLING_TYPES)],
+    },
+  }), [s.company, s.payment, s.email, s.defaults]);
+
+  const isDirty = useMemo(() => {
+    if (tab === "company") return !settingsEqual(company, savedValues.company);
+    if (tab === "sales")   return !settingsEqual(company, savedValues.company);
+    if (tab === "payment") return !settingsEqual(payment, savedValues.payment);
+    if (tab === "email")   return !settingsEqual(email,   savedValues.email);
+    if (tab === "defaults") return !settingsEqual(defaults, savedValues.defaults);
+    return false;
+  }, [tab, company, payment, email, defaults, savedValues]);
+
+  // ── beforeunload warning when dirty ─────────────────────────
+  useEffect(() => {
+    const handler = (e) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
 
   const canSaveCurrentTab = canWriteSettingsTab(tab);
 
-  const saveSettings = async () => {
+  // ── Save logic ───────────────────────────────────────────────
+  const saveSettings = useCallback(async () => {
     const payload = { id: s.id || "default" };
 
-    // Only save the active tab — admin has write on both company and sales; sending both
-    // used to overwrite company with sales-only fields and blank company info.
     if (tab === "company" && canWriteSettingsTab("company")) {
       payload.company = company;
     }
@@ -89,10 +148,49 @@ export function SettingsPage({ data, reload }) {
 
     if (Object.keys(payload).length <= 1) return;
 
-    await api.saveSettings(payload);
-    await reload();
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    clearTimeout(savedTimerRef.current);
+    setSaveState("saving");
+    setSaveError("");
+
+    try {
+      await api.saveSettings(payload);
+      await reload();
+      setSaveState("saved");
+      savedTimerRef.current = setTimeout(() => setSaveState("idle"), 2500);
+    } catch (err) {
+      setSaveState("error");
+      setSaveError(err?.message || "Could not save. Check your connection and try again.");
+    }
+  }, [tab, company, payment, email, defaults, s.id, isAccountOwner, canWriteSettingsTab, reload]);
+
+  // ── Tab switch guard ─────────────────────────────────────────
+  const handleTabClick = (newTab) => {
+    if (newTab === tab) return;
+    if (isDirty && canSaveCurrentTab && saveState !== "saving") {
+      setPendingTab(newTab);
+    } else {
+      setTab(newTab);
+      setSaveState("idle");
+      setSaveError("");
+    }
+  };
+
+  const confirmTabSwitch = (action) => {
+    if (action === "save") {
+      saveSettings().then(() => {
+        if (pendingTab) { setTab(pendingTab); setPendingTab(null); }
+      });
+    } else {
+      // Discard — reset the current tab's form back to saved values
+      setCompany({ ...savedValues.company });
+      setPayment({ ...savedValues.payment });
+      setEmail({ ...savedValues.email });
+      setDefaults({ ...savedValues.defaults });
+      setSaveState("idle");
+      setSaveError("");
+      setTab(pendingTab);
+      setPendingTab(null);
+    }
   };
 
   const removeKyc = (index) => {
@@ -123,6 +221,7 @@ export function SettingsPage({ data, reload }) {
 
   const companyCanEditAll = isAccountOwner;
   const companyCanEditLimited = false;
+  const isSaving = saveState === "saving";
 
   return (
     <div className="page">
@@ -134,12 +233,38 @@ export function SettingsPage({ data, reload }) {
       </div>
 
       <div className="settings-tabs">
-        {visibleTabs.map((t) => (
-          <button key={t.id} className={tab === t.id ? "active" : ""} onClick={() => setTab(t.id)}>
-            {t.label}
-          </button>
-        ))}
+        {visibleTabs.map((t) => {
+          const tabIsDirty = t.id === tab && isDirty && canSaveCurrentTab;
+          return (
+            <button
+              key={t.id}
+              className={tab === t.id ? "active" : ""}
+              onClick={() => handleTabClick(t.id)}
+            >
+              {t.label}
+              {tabIsDirty && <span className="tab-dirty-dot" title="Unsaved changes" />}
+            </button>
+          );
+        })}
       </div>
+
+      {/* Unsaved changes guard dialog */}
+      {pendingTab && (
+        <div className="settings-unsaved-banner">
+          <span>You have unsaved changes on this tab.</span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="button primary" style={{ padding: "4px 14px", fontSize: 13 }} onClick={() => confirmTabSwitch("save")}>
+              Save &amp; switch
+            </button>
+            <button className="button" style={{ padding: "4px 14px", fontSize: 13 }} onClick={() => confirmTabSwitch("discard")}>
+              Discard &amp; switch
+            </button>
+            <button className="button" style={{ padding: "4px 14px", fontSize: 13 }} onClick={() => setPendingTab(null)}>
+              Stay here
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="card form-card">
         {tab === "company" && (
@@ -195,11 +320,23 @@ export function SettingsPage({ data, reload }) {
 
       {canSaveCurrentTab ? (
         <div className="settings-save-row">
-          <button className="button primary" onClick={saveSettings}>Save Changes</button>
-          {saved && (
-            <span className="save-confirmation">
-              <Check size={14} strokeWidth={2.5} /> Saved successfully
-            </span>
+          <button
+            className={`button primary ${saveState === "saved" ? "save-btn-success" : ""} ${saveState === "error" ? "save-btn-error" : ""}`}
+            onClick={saveSettings}
+            disabled={isSaving || !isDirty}
+          >
+            {isSaving ? (
+              <><Loader size={14} className="spin" /> Saving…</>
+            ) : saveState === "saved" ? (
+              <><Check size={14} strokeWidth={2.5} /> Saved!</>
+            ) : saveState === "error" ? (
+              "Retry"
+            ) : (
+              isDirty ? "Save Changes" : "No changes"
+            )}
+          </button>
+          {saveState === "error" && saveError && (
+            <span className="save-error-msg">{saveError}</span>
           )}
         </div>
       ) : (

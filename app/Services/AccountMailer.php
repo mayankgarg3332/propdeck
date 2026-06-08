@@ -54,10 +54,22 @@ class AccountMailer
         $fromAddress = $email['fromEmail'];
         $fromName = $email['fromName'] ?? '';
 
+        // Validate and de-duplicate CC addresses; also remove To address from CC
+        $validCc = array_values(array_filter(
+            $cc,
+            fn ($addr) => is_string($addr)
+                && filter_var($addr, FILTER_VALIDATE_EMAIL)
+                && $addr !== $to
+        ));
+
         try {
-            Mail::mailer('account_smtp')
-                ->to($to)
-                ->send(new ProposalHtmlMail($subject, $html, $fromAddress, $fromName, $cc));
+            $mailer = Mail::mailer('account_smtp')->to($to);
+
+            if (! empty($validCc)) {
+                $mailer = $mailer->cc($validCc);
+            }
+
+            $mailer->send(new ProposalHtmlMail($subject, $html, $fromAddress, $fromName));
         } catch (TransportExceptionInterface $e) {
             throw new InvalidArgumentException(
                 'Could not send email. Check SMTP host, port, username, password, and encryption in Settings.',

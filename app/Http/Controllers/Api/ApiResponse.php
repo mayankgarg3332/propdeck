@@ -152,8 +152,23 @@ trait ApiResponse
         $hasUserDefaults = is_array($user?->defaults) && count($user->defaults) > 0;
 
         $out->payment  = $hasUserPayment  ? $user->payment  : (is_array($account?->payment)  ? $account->payment  : null);
-        $out->email    = $hasUserEmail    ? $user->email    : (is_array($account?->email)    ? $account->email    : null);
         $out->defaults = $hasUserDefaults ? $user->defaults : (is_array($account?->defaults) ? $account->defaults : null);
+
+        // Email: sub-user's SMTP fields override account's (own sender config),
+        // but account-level policy fields (defaultCc, subjectTemplate) must
+        // always come from the account so they apply to every sub-user send.
+        $accountEmail = is_array($account?->email) ? $account->email : [];
+        $userEmail    = $hasUserEmail ? $user->email : [];
+        // Merge: start with account email, overlay user's SMTP-specific fields,
+        // then re-apply account-only policy fields so they can't be lost.
+        $policyFields = ['defaultCc', 'subjectTemplate'];
+        $mergedEmail  = array_merge($accountEmail, $userEmail);
+        foreach ($policyFields as $field) {
+            if (array_key_exists($field, $accountEmail)) {
+                $mergedEmail[$field] = $accountEmail[$field];
+            }
+        }
+        $out->email = $mergedEmail ?: null;
 
         return $out;
     }

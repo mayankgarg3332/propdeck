@@ -70,11 +70,17 @@ const CMU = "#9ca3af";
  * gets mis-encoded as garbage bytes. Stripping them is safer than garbled output.
  */
 function sanitizeForPdf(text) {
-  return String(text ?? "")
-    // Remove UTF-16 surrogate pairs (emoji, symbols above U+FFFF)
-    .replace(/[\uD800-\uDFFF]/g, "")
-    // Remove anything outside the WinAnsi printable range (U+0020–U+00FF)
-    .replace(/[^\x20-\xFF]/g, "")
+  // Array.from() iterates over true Unicode code points (not UTF-16 code units),
+  // so emoji like 🥈 (U+1F948, stored as a surrogate pair 🥈) are
+  // treated as a single character and filtered out cleanly. The regex approach
+  // operates on code units and can let surrogate bytes bleed through jsPDF's
+  // internal Latin-1 encoder, producing garbage like "Ø>ÝH".
+  return Array.from(String(text ?? ""))
+    .filter((char) => {
+      const code = char.codePointAt(0);
+      return code >= 0x20 && code <= 0xFF;
+    })
+    .join("")
     .replace(/\s+/g, " ")
     .trim();
 }

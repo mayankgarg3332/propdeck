@@ -1,10 +1,15 @@
 import { formatDate, formatINR, getStatusStyle } from "../../lib/format.js";
 
-export function ProposalDetailModal({ proposal, client, rep, settings, onClose, onPdf }) {
+export function ProposalDetailModal({ proposal, client, rep, settings, teamMembers, onClose, onPdf }) {
   if (!proposal) return null;
   const statusStyle = getStatusStyle(proposal.status);
-  const preparedBy = settings?.company?.signatory || rep?.name || proposal.repId || "—";
-  const phone = settings?.company?.phone || rep?.phone || "—";
+
+  // If the master user is viewing a proposal created by someone else, resolve
+  // that creator's salesperson details from teamMembers instead of using the
+  // currently-logged-in user's settings.
+  const creator = teamMembers?.[proposal.createdByUserId];
+  const preparedBy = creator?.signatory || settings?.company?.signatory || rep?.name || proposal.repId || "—";
+  const phone = creator?.phone || settings?.company?.phone || rep?.phone || "—";
 
   return (
     <div className="modal-backdrop" onClick={onClose}>

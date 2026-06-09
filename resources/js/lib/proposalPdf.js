@@ -63,7 +63,23 @@ const CM = "#374151";
 const CL = "#6b7280";
 const CMU = "#9ca3af";
 
-export function downloadProposalPdf({ proposal, client, settings, rep, lineItems, totals, frequency, upiQrDataUrl = null }) {
+/**
+ * Strip characters that Helvetica (WinAnsi) cannot render.
+ * jsPDF uses Helvetica as its only built-in font, which covers U+0020–U+00FF.
+ * Anything outside that range — emojis (surrogate pairs), CJK, Arabic, etc. —
+ * gets mis-encoded as garbage bytes. Stripping them is safer than garbled output.
+ */
+function sanitizeForPdf(text) {
+  return String(text ?? "")
+    // Remove UTF-16 surrogate pairs (emoji, symbols above U+FFFF)
+    .replace(/[\uD800-\uDFFF]/g, "")
+    // Remove anything outside the WinAnsi printable range (U+0020–U+00FF)
+    .replace(/[^\x20-\xFF]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function downloadProposalPdf({ proposal, client, settings, rep, creatorSettings, lineItems, totals, frequency, upiQrDataUrl = null }) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
@@ -87,19 +103,24 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
   validTill.setDate(validTill.getDate() + validityDays);
   const dateStr = formatDate(proposalDate.toISOString().split("T")[0]);
   const validTillStr = formatDate(validTill.toISOString().split("T")[0]);
-  const signatory = company.signatory || rep?.name || "Sales Team";
-  const phone = company.phone || rep?.phone || "";
+  // If a creatorSettings object is provided (master viewing sub-user's proposal),
+  // use the creator's signatory/phone; otherwise fall back to logged-in user's settings.
+  const signatory = creatorSettings?.signatory || company.signatory || rep?.name || "Sales Team";
+  const phone = creatorSettings?.phone || company.phone || rep?.phone || "";
   const repEmail = company.email || rep?.email || "";
 
   const txt = (text, x, lineY, opts = {}) => {
     doc.setFont("helvetica", opts.bold ? "bold" : "normal");
     doc.setFontSize(opts.size || 10);
     doc.setTextColor(opts.color || CD);
-    doc.text(String(text ?? ""), x, lineY, {
+    doc.text(sanitizeForPdf(text), x, lineY, {
       align: opts.align || "left",
       maxWidth: opts.maxWidth || CW,
     });
   };
+
+  // Sanitized version of splitTextToSize — always strips emoji/non-Latin before measuring
+  const splitSafe = (text, maxW) => doc.splitTextToSize(sanitizeForPdf(text), maxW);
 
   const need = (h) => {
     if (y + h > ph - 48) {
@@ -230,7 +251,7 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
             doc.setFont("helvetica", "normal");
             doc.setFontSize(7.5);
             const featureLineGroups = (plan.features || []).map((f) =>
-              doc.splitTextToSize(`- ${f}`, featMaxW)
+              splitSafe(`- ${f}`, featMaxW)
             );
             const featH = featureLineGroups.reduce((s, ls) => s + ls.length * 10, 0);
             const badgeH  = isRec ? 18 : 0;
@@ -271,8 +292,8 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
             doc.setFont("helvetica", "bold");
             doc.setFontSize(9);
             doc.setTextColor(CD);
-            const nameLines = doc.splitTextToSize(plan.name, colW2 - 12);
-            doc.text(nameLines, cx + 6, ry);
+            const nameLines = splitSafe(plan.name, colW2 - 12);
+            doc.text(nameLines.map(sanitizeForPdf), cx + 6, ry);
             ry += nameLines.length * 12;
 
             // Strikethrough MRP
@@ -313,7 +334,7 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
             doc.setFontSize(7.5);
             doc.setTextColor(isRec ? CM : CL);
             featureLineGroups.forEach((lines) => {
-              doc.text(lines, cx + 6, ry);
+              doc.text(lines.map(sanitizeForPdf), cx + 6, ry);
               ry += lines.length * 10;
             });
           });
@@ -509,7 +530,7 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
     }
     const textX = upiQrDataUrl ? M + 14 + qrSize + 12 : M + 14;
     txt("PAY VIA UPI", textX, bY + 11, { size: 8, bold: true, color: acd });
-    const upiLines = doc.splitTextToSize(payment.upi || "", CW - (upiQrDataUrl ? qrSize + 44 : 28));
+    const upiLines = splitSafe(payment.upi || "", CW - (upiQrDataUrl ? qrSize + 44 : 28));
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     doc.setTextColor(CD);
@@ -545,7 +566,7 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
     txt("Terms & Conditions", M, y, { size: 12, bold: true });
     y += 14;
     terms.forEach((term, i) => {
-      const lines = doc.splitTextToSize(`${i + 1}. ${term}`, CW);
+      const lines = splitSafe(`${i + 1}. ${term}`, CW);
       need(lines.length * 13 + 6);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8.5);
@@ -565,7 +586,7 @@ export function downloadProposalPdf({ proposal, client, settings, rep, lineItems
   txt(company.name || "Propdeck", pw / 2, y, { size: 11, bold: true, color: headerColor, align: "center" });
   y += 14;
   if (company.address) {
-    const addrLines = doc.splitTextToSize(company.address.replace(/\n/g, ", "), CW - 60);
+    const addrLines = splitSafe(company.address.replace(/\n/g, ", "), CW - 60);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(CL);

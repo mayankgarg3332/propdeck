@@ -241,18 +241,30 @@ trait ApiResponse
         $settings = $this->mergeEffectiveSettings($accountSettings, $userSettings);
         $rep = Rep::where('user_id', $accountId)->first();
 
-        // Build teamMembers map (id → {name, email}) for the account owner only.
-        // Includes the owner + all sub-users so proposals can show who created them.
+        // Build teamMembers map (id → {name, email, signatory, phone}) for the account owner only.
+        // Includes the owner + all sub-users so proposals can show who created them,
+        // and so the View/PDF modal can show the correct salesperson details per proposal.
         $teamMembers = null;
         if ($user->isAccountOwner()) {
             $owner = User::find($accountId);
             $subUsers = User::where('parent_user_id', $accountId)->get();
+            $accountSettingsForTeam = AppSetting::findForAccount($accountId);
             $teamMembers = collect([$owner])
                 ->merge($subUsers)
                 ->filter()
-                ->mapWithKeys(fn (User $u) => [
-                    $u->id => ['name' => $u->name, 'email' => $u->email],
-                ])
+                ->mapWithKeys(function (User $u) use ($accountId, $accountSettingsForTeam) {
+                    $userSettings = AppSetting::findForUser($u->id);
+                    $effective = $this->mergeEffectiveSettings($accountSettingsForTeam, $userSettings);
+                    $company = is_array($effective?->company) ? $effective->company : [];
+                    return [
+                        $u->id => [
+                            'name'      => $u->name,
+                            'email'     => $u->email,
+                            'signatory' => $company['signatory'] ?? null,
+                            'phone'     => $company['phone'] ?? null,
+                        ],
+                    ];
+                })
                 ->all();
         }
 

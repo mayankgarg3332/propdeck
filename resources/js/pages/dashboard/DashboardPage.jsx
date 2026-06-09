@@ -127,17 +127,22 @@ export function DashboardPage({ data, reload, navigate, openNewProposal }) {
           client={data.clients.find((client) => client.id === viewingProposal.clientId)}
           rep={data.rep}
           settings={data.settings}
+          teamMembers={data.teamMembers}
           onClose={() => setViewingProposal(null)}
-          onPdf={(proposal) => downloadProposalPdf({
-            proposal,
-            client: data.clients.find((client) => client.id === proposal.clientId),
-            settings: data.settings,
-            rep: data.rep,
-            lineItems: lineItemsFromProposal(proposal),
-            totals: totalsFromProposal(proposal),
-            frequency: proposal.frequency,
-            upiQrDataUrl,
-          })}
+          onPdf={(proposal) => {
+            const creator = data.teamMembers?.[proposal.createdByUserId];
+            downloadProposalPdf({
+              proposal,
+              client: data.clients.find((client) => client.id === proposal.clientId),
+              settings: data.settings,
+              rep: data.rep,
+              creatorSettings: creator,
+              lineItems: lineItemsFromProposal(proposal),
+              totals: totalsFromProposal(proposal),
+              frequency: proposal.frequency,
+              upiQrDataUrl,
+            });
+          }}
         />
       )}
 

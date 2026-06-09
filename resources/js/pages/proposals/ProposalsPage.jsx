@@ -46,11 +46,13 @@ export function ProposalsPage({ data, reload }) {
   };
 
   const exportPdf = (proposal) => {
+    const creator = data.teamMembers?.[proposal.createdByUserId];
     downloadProposalPdf({
       proposal,
       client: data.clients.find((client) => client.id === proposal.clientId),
       settings: data.settings,
       rep: data.rep,
+      creatorSettings: creator,
       lineItems: lineItemsFromProposal(proposal),
       totals: totalsFromProposal(proposal),
       frequency: proposal.frequency,
@@ -94,6 +96,7 @@ export function ProposalsPage({ data, reload }) {
           client={data.clients.find((client) => client.id === viewingProposal.clientId)}
           rep={data.rep}
           settings={data.settings}
+          teamMembers={data.teamMembers}
           onClose={() => setViewingProposal(null)}
           onPdf={exportPdf}
         />

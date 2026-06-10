@@ -12,13 +12,14 @@ class Proposal extends Model
 
     protected $fillable = [
         'id', 'user_id', 'created_by_user_id', 'client_id', 'products', 'amount', 'subtotal', 'gst', 'status',
-        'date', 'rep_id', 'frequency', 'extras_heading', 'extras_text', 'line_items_snapshot', 'status_updated_at', 'created_at_custom',
+        'date', 'rep_id', 'frequency', 'extras_heading', 'extras_text', 'content_blocks', 'line_items_snapshot', 'status_updated_at', 'created_at_custom',
     ];
 
     protected function casts(): array
     {
         return [
             'products' => 'array',
+            'content_blocks' => 'array',
             'line_items_snapshot' => 'array',
             'date' => 'date',
             'amount' => 'float',

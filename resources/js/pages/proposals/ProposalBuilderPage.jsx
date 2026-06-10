@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Check, Mail } from "lucide-react";
+import { Check, Mail, X, Plus } from "lucide-react";
 import { SendProposalEmailModal } from "../../components/SendProposalEmailModal.jsx";
 import { formatINR, amountInWords } from "../../lib/format.js";
 import { buildLineItems, nextProposalId, summarizeProposal, normalizeSelection } from "../../lib/proposalMath.js";
@@ -10,7 +10,16 @@ import { buildProposalHtmlEmail, generateUpiQr, renderExtrasHtml } from "../../l
 import { billingLabel, getBillingTypes } from "../../lib/billingTypes.js";
 import { getStatusByRole } from "../../lib/proposalStatuses.js";
 
-const steps = ["Client Details", "Select Products", "Pricing", "Preview & Send"];
+const steps = ["Client Details", "Select Products", "Pricing", "Extras & Policies", "Preview & Send"];
+
+// Migrate old `terms` → contentBlocks for proposals created before the new format
+function migrateBuilderContentBlocks(defaults) {
+  if (defaults?.contentBlocks?.length) return defaults.contentBlocks;
+  if (defaults?.terms?.length) {
+    return [{ id: "cb_terms_legacy", title: "Terms & Conditions", content: [...defaults.terms], enabled: true }];
+  }
+  return [];
+}
 
 export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
   const [step, setStep] = useState(1);
@@ -23,6 +32,18 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
   const [paymentLink, setPaymentLink] = useState("");
   const [extrasHeading, setExtrasHeading] = useState("");
   const [extrasText, setExtrasText] = useState("");
+  const [contentBlocks, setContentBlocks] = useState(() => {
+    const globalBlocks = data.settings?.defaults?.contentBlocks
+      || migrateBuilderContentBlocks(data.settings?.defaults);
+    return globalBlocks
+      .filter((b) => b.enabled)
+      .map((b) => ({
+        ...b,
+        id: `cb_${Date.now()}_${Math.random().toString(36).slice(2, 7)}_${b.id}`,
+        content: [...(b.content || [])],
+        source: "global",
+      }));
+  });
   const [sendModalOpen, setSendModalOpen] = useState(false);
   const [saved, setSaved] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -108,6 +129,7 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
       frequency,
       extrasHeading: extrasHeading.trim(),
       extrasText: extrasText.trim(),
+      contentBlocks,
       lineItemsSnapshot: lineItems.map((item) => ({
         productName: item.product.name,
         productColor: item.product.color,
@@ -173,6 +195,7 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
         date: new Date().toISOString().split("T")[0],
         extrasHeading: extrasHeading.trim(),
         extrasText: extrasText.trim(),
+        contentBlocks,
       },
       client,
       settings: data.settings,
@@ -322,8 +345,7 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
       )}
 
       {step === 3 && (
-        <>
-          <div className="pricing-layout">
+        <div className="pricing-layout">
             <div>
               {lineItems.map((item) => (
                 <div className="card price-item" key={item.product.id}>
@@ -363,6 +385,11 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
             </div>
           </div>
 
+      )}
+
+      {step === 4 && (
+        <>
+          {/* ── Complimentary / Extras ─────────────────────────── */}
           <div className="card extras-card">
             <h3 className="extras-title">
               Complimentary / Extras <span className="extras-optional">(optional)</span>
@@ -386,15 +413,27 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
                 style={{ minHeight: 120, resize: "vertical", marginTop: 6 }}
                 value={extrasText}
                 onChange={(e) => setExtrasText(e.target.value)}
-                placeholder={"Write a paragraph or use bullet points:\\n- Free onboarding session\\n- 1 month priority support\\n- Dedicated account manager"}
+                placeholder={"Write a paragraph or use bullet points:\n- Free onboarding session\n- 1 month priority support\n- Dedicated account manager"}
               />
               <span className="field-hint">Lines starting with - or • are rendered as bullets in the proposal.</span>
             </label>
           </div>
+
+          {/* ── Content Blocks (Terms, Policies, etc.) ─────────── */}
+          <div className="card extras-card" style={{ marginTop: 16 }}>
+            <h3 className="extras-title">Policies & Terms</h3>
+            <p className="extras-hint">
+              Sections below are pre-filled from your company defaults. Remove any you don't want on this proposal, edit content inline, or add a custom section.
+            </p>
+            <ProposalContentBlocks
+              blocks={contentBlocks}
+              onChange={setContentBlocks}
+            />
+          </div>
         </>
       )}
 
-      {step === 4 && (
+      {step === 5 && (
         <div>
           <div className="send-actions">
             <button className="button primary" onClick={() => setSendModalOpen(true)}>
@@ -406,13 +445,13 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
             </button>
           </div>
           {saveError && <div className="form-error" style={{ marginBottom: 16 }}>{saveError}</div>}
-          <ProposalPreview client={client} data={data} lineItems={lineItems} totals={totals} proposalId={proposalId} paymentLink={paymentLink} frequency={frequency} extrasHeading={extrasHeading.trim()} extrasText={extrasText.trim()} upiQrDataUrl={upiQrDataUrl} />
+          <ProposalPreview client={client} data={data} lineItems={lineItems} totals={totals} proposalId={proposalId} paymentLink={paymentLink} frequency={frequency} extrasHeading={extrasHeading.trim()} extrasText={extrasText.trim()} contentBlocks={contentBlocks} upiQrDataUrl={upiQrDataUrl} />
         </div>
       )}
 
       <div className="builder-actions">
         <button className="button" disabled={step === 1} onClick={() => setStep(Math.max(1, step - 1))}>Back</button>
-        {step < 4 && <button className="button primary" onClick={() => setStep(Math.min(4, step + 1))}>Continue</button>}
+        {step < 5 && <button className="button primary" onClick={() => setStep(Math.min(5, step + 1))}>Continue</button>}
       </div>
 
       {sendModalOpen && (
@@ -424,7 +463,7 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
           subject={(data.settings?.email?.subjectTemplate || "Proposal {{id}} for {{agency}}")
             .replace("{{id}}", proposalId)
             .replace("{{agency}}", client.agency || "")}
-          htmlBody={buildProposalHtmlEmail({ client, proposalId, lineItems, totals, paymentLink, frequency, extrasHeading: extrasHeading.trim(), extrasText: extrasText.trim(), settings: data.settings, rep: data.rep })}
+          htmlBody={buildProposalHtmlEmail({ client, proposalId, lineItems, totals, paymentLink, frequency, extrasHeading: extrasHeading.trim(), extrasText: extrasText.trim(), contentBlocks, settings: data.settings, rep: data.rep })}
           proposalId={proposalId}
           onBeforeSend={async () => {
             const saved = await saveProposal(getStatusByRole(data.settings, "initial")?.value || "Draft");
@@ -551,6 +590,73 @@ function Field({ label, value = "", onChange }) {
 }
 
 
+// ── ProposalContentBlocks — per-proposal editor in step 4 ───────────────────
+function ProposalContentBlocks({ blocks, onChange }) {
+  const addCustomBlock = () => {
+    const id = `cb_custom_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    onChange([...blocks, { id, title: "", content: [], source: "custom" }]);
+  };
+
+  const removeBlock = (id) => onChange(blocks.filter((b) => b.id !== id));
+
+  const updateBlock = (id, field, value) =>
+    onChange(blocks.map((b) => (b.id === id ? { ...b, [field]: value } : b)));
+
+  return (
+    <div className="proposal-content-blocks">
+      {blocks.length === 0 && (
+        <p style={{ fontSize: 13, color: "#9ca3af", margin: "4px 0 8px" }}>
+          No default sections are active. You can add a custom one below.
+        </p>
+      )}
+      {blocks.map((block) => (
+        <div key={block.id} className="proposal-block-card">
+          <div className="proposal-block-header">
+            {block.source === "custom" ? (
+              <input
+                className="input proposal-block-title-input"
+                value={block.title}
+                placeholder="Section title (e.g. Special Clause)"
+                onChange={(e) => updateBlock(block.id, "title", e.target.value)}
+              />
+            ) : (
+              <span className="proposal-block-title">{block.title}</span>
+            )}
+            {block.source === "custom" && (
+              <span className="proposal-block-badge">Custom</span>
+            )}
+            <button
+              className="kyc-remove"
+              onClick={() => removeBlock(block.id)}
+              title="Remove from this proposal"
+              style={{ marginLeft: "auto" }}
+            >
+              <X size={13} />
+            </button>
+          </div>
+          <div className="proposal-block-body">
+            <textarea
+              className="textarea"
+              style={{ minHeight: 100, resize: "vertical", lineHeight: 1.7 }}
+              value={(block.content || []).join("\n")}
+              placeholder={"Item 1\nItem 2\nItem 3"}
+              onChange={(e) => updateBlock(block.id, "content", e.target.value.split("\n"))}
+            />
+            <span className="field-hint">One item per line. Numbered automatically in the proposal.</span>
+          </div>
+        </div>
+      ))}
+      <button
+        className="button"
+        style={{ marginTop: 4, display: "inline-flex", alignItems: "center", gap: 6 }}
+        onClick={addCustomBlock}
+      >
+        <Plus size={14} /> Add custom section
+      </button>
+    </div>
+  );
+}
+
 function renderExtrasJsx(extrasText) {
   if (!extrasText) return null;
   const lines = extrasText.split("\n").filter((l) => l.trim());
@@ -571,14 +677,14 @@ function renderExtrasJsx(extrasText) {
   });
 }
 
-function ProposalPreview({ client, data, lineItems, totals, proposalId, paymentLink, frequency, extrasHeading, extrasText, upiQrDataUrl }) {
+function ProposalPreview({ client, data, lineItems, totals, proposalId, paymentLink, frequency, extrasHeading, extrasText, contentBlocks, upiQrDataUrl }) {
   const company = data.settings?.company || {};
   const headerColor = getProposalHeaderColor(company);
   const headerSub = headerSubtitleColor();
   const { primary: ac, primaryDark: acd, primaryBg: acbg, primaryBadgeBg: acbadge } = buildProposalTheme(headerColor);
   const payment = data.settings?.payment || {};
   const kyc = data.settings?.defaults?.kyc || [];
-  const terms = data.settings?.defaults?.terms || [];
+  const activeBlocks = contentBlocks || [];
   const gstRate = data.settings?.defaults?.gstRate || 18;
   const validityDays = data.settings?.defaults?.validityDays || 7;
   const freqLabel = frequency || "monthly";
@@ -804,17 +910,23 @@ function ProposalPreview({ client, data, lineItems, totals, proposalId, paymentL
           </>
         )}
 
-        {/* Terms */}
-        {terms.length > 0 && (
-          <>
-            <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", marginBottom: 8 }}>Terms & Conditions</div>
-            <div style={{ marginBottom: 20 }}>
-              {terms.map((term, i) => (
-                <div key={i} style={{ fontSize: 12, color: "#6b7280", padding: "2px 0" }}>{i + 1}. {term}</div>
-              ))}
+        {/* Content Blocks (Terms, Policies, etc.) */}
+        {activeBlocks.map((block) => {
+          const lines = (block.content || []).filter((l) => l.trim());
+          if (!block.title && lines.length === 0) return null;
+          return (
+            <div key={block.id} style={{ marginBottom: 20 }}>
+              {block.title && (
+                <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", marginBottom: 8 }}>{block.title}</div>
+              )}
+              <div>
+                {lines.map((line, i) => (
+                  <div key={i} style={{ fontSize: 12, color: "#6b7280", padding: "2px 0" }}>{i + 1}. {line}</div>
+                ))}
+              </div>
             </div>
-          </>
-        )}
+          );
+        })}
 
         {/* Signature */}
         <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: 16 }}>

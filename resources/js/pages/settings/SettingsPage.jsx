@@ -20,6 +20,20 @@ const TABS = [
   { id: "defaults", label: "Defaults" },
 ];
 
+// Migrate old `terms` array → new `contentBlocks` format (backward compat)
+function migrateContentBlocks(defaults) {
+  if (defaults?.contentBlocks) return defaults.contentBlocks.map((b) => ({ ...b }));
+  if (defaults?.terms?.length) {
+    return [{
+      id: "cb_terms_legacy",
+      title: "Terms & Conditions",
+      content: [...defaults.terms],
+      enabled: true,
+    }];
+  }
+  return [];
+}
+
 // Deep-equality check sufficient for settings (JSON-serialisable objects/arrays)
 function settingsEqual(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
@@ -55,7 +69,7 @@ export function SettingsPage({ data, reload }) {
   const [defaults, setDefaults] = useState({
     ...(s.defaults || {}),
     kyc: [...(s.defaults?.kyc || [])],
-    terms: [...(s.defaults?.terms || [])],
+    contentBlocks: migrateContentBlocks(s.defaults),
     billingTypes: [...(s.defaults?.billingTypes || DEFAULT_BILLING_TYPES)],
     proposalStatuses: [...(s.defaults?.proposalStatuses || DEFAULT_PROPOSAL_STATUSES)],
   });
@@ -77,7 +91,7 @@ export function SettingsPage({ data, reload }) {
     setDefaults({
       ...(s.defaults || {}),
       kyc: [...(s.defaults?.kyc || [])],
-      terms: [...(s.defaults?.terms || [])],
+      contentBlocks: migrateContentBlocks(s.defaults),
       billingTypes: [...(s.defaults?.billingTypes || DEFAULT_BILLING_TYPES)],
       proposalStatuses: [...(s.defaults?.proposalStatuses || DEFAULT_PROPOSAL_STATUSES)],
     });
@@ -100,7 +114,7 @@ export function SettingsPage({ data, reload }) {
     defaults: {
       ...(s.defaults || {}),
       kyc: [...(s.defaults?.kyc || [])],
-      terms: [...(s.defaults?.terms || [])],
+      contentBlocks: migrateContentBlocks(s.defaults),
       billingTypes: [...(s.defaults?.billingTypes || DEFAULT_BILLING_TYPES)],
       proposalStatuses: [...(s.defaults?.proposalStatuses || DEFAULT_PROPOSAL_STATUSES)],
     },
@@ -562,8 +576,114 @@ function EmailTab({ form, onChange, readOnly }) {
   );
 }
 
+// ── ContentBlocksManager ──────────────────────────────────────────────────────
+function ContentBlocksManager({ blocks, onChange, readOnly }) {
+  const [expanded, setExpanded] = useState({});
+
+  const toggleExpand = (id) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+
+  const addBlock = () => {
+    const id = `cb_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const newBlock = { id, title: "", content: [], enabled: true };
+    onChange([...blocks, newBlock]);
+    setExpanded((prev) => ({ ...prev, [id]: true }));
+  };
+
+  const removeBlock = (id) => onChange(blocks.filter((b) => b.id !== id));
+
+  const updateBlock = (id, field, value) =>
+    onChange(blocks.map((b) => (b.id === id ? { ...b, [field]: value } : b)));
+
+  const moveBlock = (index, direction) => {
+    const next = [...blocks];
+    const swap = index + direction;
+    if (swap < 0 || swap >= next.length) return;
+    [next[index], next[swap]] = [next[swap], next[index]];
+    onChange(next);
+  };
+
+  return (
+    <div className="content-blocks-manager">
+      {blocks.length === 0 && (
+        <div className="content-blocks-empty">
+          No content blocks yet. Add one below — it will auto-insert into every new proposal.
+        </div>
+      )}
+      {blocks.map((block, index) => {
+        const isOpen = !!expanded[block.id];
+        const contentText = (block.content || []).join("\n");
+        return (
+          <div key={block.id} className={`content-block-card ${block.enabled ? "" : "disabled"}`}>
+            <div className="content-block-header">
+              <div className="content-block-drag">
+                {!readOnly && (
+                  <div className="cb-move-btns">
+                    <button className="cb-move-btn" onClick={() => moveBlock(index, -1)} disabled={index === 0} title="Move up">▲</button>
+                    <button className="cb-move-btn" onClick={() => moveBlock(index, 1)} disabled={index === blocks.length - 1} title="Move down">▼</button>
+                  </div>
+                )}
+                <GripVertical size={14} style={{ color: "#9ca3af", flexShrink: 0 }} />
+              </div>
+              {readOnly ? (
+                <span className="content-block-title-static">{block.title || <em style={{ color: "#9ca3af" }}>Untitled</em>}</span>
+              ) : (
+                <input
+                  className="input content-block-title-input"
+                  value={block.title}
+                  placeholder="Block title (e.g. Terms & Conditions)"
+                  onChange={(e) => updateBlock(block.id, "title", e.target.value)}
+                />
+              )}
+              <div className="content-block-actions">
+                <label className="cb-toggle" title={block.enabled ? "Auto-inject enabled" : "Auto-inject disabled"}>
+                  <input
+                    type="checkbox"
+                    checked={block.enabled}
+                    disabled={readOnly}
+                    onChange={readOnly ? undefined : (e) => updateBlock(block.id, "enabled", e.target.checked)}
+                  />
+                  <span className="cb-toggle-label">{block.enabled ? "On" : "Off"}</span>
+                </label>
+                <button
+                  className="cb-expand-btn"
+                  onClick={() => toggleExpand(block.id)}
+                  title={isOpen ? "Collapse" : "Edit content"}
+                >
+                  {isOpen ? "▲ Hide" : "▼ Edit"}
+                </button>
+                {!readOnly && (
+                  <button className="kyc-remove" onClick={() => removeBlock(block.id)} title="Delete block">
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+            </div>
+            {isOpen && (
+              <div className="content-block-body">
+                <textarea
+                  className="textarea"
+                  style={{ minHeight: 110, resize: "vertical", lineHeight: 1.7 }}
+                  value={contentText}
+                  readOnly={readOnly}
+                  placeholder={"Item 1\nItem 2\nItem 3"}
+                  onChange={readOnly ? undefined : (e) => updateBlock(block.id, "content", e.target.value.split("\n"))}
+                />
+                <span className="field-hint">One item per line. Numbered automatically in proposals.</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {!readOnly && (
+        <button className="button" style={{ marginTop: 10, display: "inline-flex", alignItems: "center", gap: 6 }} onClick={addBlock}>
+          <Plus size={14} /> Add content block
+        </button>
+      )}
+    </div>
+  );
+}
+
 function DefaultsTab({ form, onChange, newKyc, setNewKyc, onAddKyc, onKycKey, onRemoveKyc, readOnly, proposals = [] }) {
-  const termsText = (form.terms || []).join("\n");
   const billingTypes = form.billingTypes || DEFAULT_BILLING_TYPES;
 
   const updateBillingType = (index, field, value) => {
@@ -719,18 +839,18 @@ function DefaultsTab({ form, onChange, newKyc, setNewKyc, onAddKyc, onKycKey, on
         </div>
       </div>
 
-      <label className="span-2">
-        <span className="field-label">Default Terms & Conditions</span>
-        <textarea
-          className="textarea"
-          style={{ minHeight: 140, resize: "vertical", lineHeight: 1.7 }}
-          value={termsText}
+      {/* ── Default Content Blocks ─────────────────────────── */}
+      <div className="span-2">
+        <span className="field-label">Default Content Blocks</span>
+        <span className="field-hint" style={{ display: "block", marginBottom: 12 }}>
+          These sections are automatically added to every new proposal. Toggle to enable/disable auto-injection. Each block's content goes one item per line, numbered automatically.
+        </span>
+        <ContentBlocksManager
+          blocks={form.contentBlocks || []}
+          onChange={(blocks) => onChange("contentBlocks", blocks)}
           readOnly={readOnly}
-          placeholder={"Term 1\nTerm 2\nTerm 3"}
-          onChange={readOnly ? undefined : (e) => onChange("terms", e.target.value.split("\n"))}
         />
-        <span className="field-hint">One term per line. Numbered automatically in proposals.</span>
-      </label>
+      </div>
     </div>
   );
 }

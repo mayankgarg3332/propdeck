@@ -108,13 +108,20 @@ export function buildProposalHtmlEmail({
   frequency = "monthly",
   extrasHeading = "",
   extrasText = "",
+  contentBlocks = null,
   settings,
   rep,
   proposalDate = null,
 }) {
   const payment = settings?.payment || {};
   const kyc = settings?.defaults?.kyc || [];
-  const terms = settings?.defaults?.terms || [];
+  // Content blocks: per-proposal snapshot takes priority; fall back to global defaults
+  const activeBlocks = contentBlocks
+    || (settings?.defaults?.contentBlocks
+      ? settings.defaults.contentBlocks.filter((b) => b.enabled)
+      : (settings?.defaults?.terms?.length
+          ? [{ id: "terms_legacy", title: "Terms & Conditions", content: settings.defaults.terms }]
+          : []));
   const gstRate = settings?.defaults?.gstRate || 18;
   const validityDays = settings?.defaults?.validityDays || 7;
   const company = settings?.company || {};
@@ -261,7 +268,14 @@ export function buildProposalHtmlEmail({
   }
 
   const kycItems = kyc.map((d, i) => `<div style="padding:3px 0;font-size:13px;color:#92400e;">${i + 1}. ${d}</div>`).join("");
-  const termItems = terms.map((t, i) => `<div style="padding:3px 0;font-size:12px;color:#6b7280;">${i + 1}. ${t}</div>`).join("");
+  const contentBlocksHtml = activeBlocks.map((block) => {
+    const lines = (block.content || []).filter((l) => l.trim());
+    if (!block.title && lines.length === 0) return "";
+    const items = lines.map((t, i) => `<div style="padding:3px 0;font-size:12px;color:#6b7280;">${i + 1}. ${t}</div>`).join("");
+    return `
+  ${block.title ? `<h3 style="margin:0 0 10px;font-size:15px;color:#111827;font-weight:700;">${block.title}</h3>` : ""}
+  <div style="margin-bottom:24px;">${items}</div>`;
+  }).join("");
 
   return `<!DOCTYPE html>
 <html>
@@ -366,9 +380,7 @@ export function buildProposalHtmlEmail({
     <div style="border-left:4px solid #f59e0b;padding:14px 16px;">${kycItems}</div>
   </div>` : ""}
 
-  ${terms.length > 0 ? `
-  <h3 style="margin:0 0 10px;font-size:15px;color:#111827;font-weight:700;">Terms & Conditions</h3>
-  <div style="margin-bottom:24px;">${termItems}</div>` : ""}
+  ${activeBlocks.length > 0 ? contentBlocksHtml : ""}
 
   <div style="border-top:1px solid #f3f4f6;padding-top:18px;">
     <div style="font-weight:700;color:#111827;font-size:14px;">${signatory}</div>

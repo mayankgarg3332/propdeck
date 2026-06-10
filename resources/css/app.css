@@ -2237,3 +2237,191 @@ kbd {
   cursor: not-allowed;
   opacity: 0.5;
 }
+
+/* ── Content Blocks Manager (Settings → Defaults) ──────────────────────── */
+.content-blocks-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.content-blocks-empty {
+  font-size: 13px;
+  color: #9ca3af;
+  padding: 12px 0 4px;
+}
+
+.content-block-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  transition: border-color 0.15s;
+}
+
+.content-block-card.disabled {
+  opacity: 0.6;
+}
+
+.content-block-card:hover {
+  border-color: #d1d5db;
+}
+
+.content-block-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border-bottom: 1px solid transparent;
+}
+
+.content-block-card .content-block-header:has(+ .content-block-body) {
+  border-bottom-color: #e5e7eb;
+}
+
+.content-block-drag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.cb-move-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cb-move-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 9px;
+  color: #9ca3af;
+  padding: 1px 3px;
+  line-height: 1;
+  border-radius: 3px;
+}
+
+.cb-move-btn:hover:not(:disabled) {
+  color: #374151;
+  background: #e5e7eb;
+}
+
+.cb-move-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.content-block-title-input {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+}
+
+.content-block-title-static {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: #111827;
+}
+
+.content-block-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.cb-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.cb-toggle input[type="checkbox"] {
+  accent-color: #111827;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.cb-toggle-label {
+  font-size: 12px;
+  color: #6b7280;
+  min-width: 22px;
+}
+
+.cb-expand-btn {
+  background: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 5px;
+  padding: 3px 9px;
+  font-size: 11px;
+  color: #6b7280;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cb-expand-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.content-block-body {
+  padding: 12px;
+  background: #fff;
+}
+
+/* ── Content Blocks — Proposal Builder (Extras & Policies step) ────────── */
+.proposal-content-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.proposal-block-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.proposal-block-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.proposal-block-title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.proposal-block-badge {
+  font-size: 10px;
+  font-weight: 700;
+  background: #ede9fe;
+  color: #5b21b6;
+  padding: 2px 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.proposal-block-body {
+  padding: 12px 14px;
+}
+
+.proposal-block-title-input {
+  flex: 1;
+  font-weight: 500;
+}

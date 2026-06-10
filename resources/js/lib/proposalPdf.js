@@ -99,7 +99,13 @@ export function downloadProposalPdf({ proposal, client, settings, rep, creatorSe
   const { primary: ac, primaryDark: acd, primaryBg: acbg, primaryBadgeBg: acbadge, primaryOnSolid: acos } = buildProposalTheme(headerColor);
   const payment = settings?.payment || {};
   const kyc = settings?.defaults?.kyc || [];
-  const terms = settings?.defaults?.terms || [];
+  // Content blocks: use per-proposal snapshot if available, else fall back to global defaults (migration path)
+  const contentBlocks = proposal.contentBlocks
+    || (settings?.defaults?.contentBlocks
+      ? settings.defaults.contentBlocks.filter((b) => b.enabled)
+      : (settings?.defaults?.terms?.length
+          ? [{ id: "terms_legacy", title: "Terms & Conditions", content: settings.defaults.terms }]
+          : []));
   const gstRate = settings?.defaults?.gstRate || 18;
   const validityDays = settings?.defaults?.validityDays || 7;
   const freqLabel = frequency || "monthly";
@@ -566,21 +572,26 @@ export function downloadProposalPdf({ proposal, client, settings, rep, creatorSe
     y += kH + 18;
   }
 
-  // ── TERMS ────────────────────────────────────────────────
-  if (terms.length > 0) {
+  // ── CONTENT BLOCKS (Terms, Policies, etc.) ───────────────
+  contentBlocks.forEach((block) => {
+    const lines = (block.content || []).filter((l) => l.trim());
+    if (!block.title && lines.length === 0) return;
     need(24);
-    txt("Terms & Conditions", M, y, { size: 12, bold: true });
-    y += 14;
-    terms.forEach((term, i) => {
-      const lines = splitSafe(`${i + 1}. ${term}`, CW);
-      need(lines.length * 13 + 6);
+    if (block.title) {
+      txt(block.title, M, y, { size: 12, bold: true });
+      y += 14;
+    }
+    lines.forEach((item, i) => {
+      const wrapped = splitSafe(`${i + 1}. ${item}`, CW);
+      need(wrapped.length * 13 + 6);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8.5);
       doc.setTextColor(CL);
-      doc.text(lines, M, y);
-      y += lines.length * 13 + 4;
+      doc.text(wrapped, M, y);
+      y += wrapped.length * 13 + 4;
     });
-  }
+    y += 6;
+  });
 
   // ── FOOTER ───────────────────────────────────────────────
   need(90);

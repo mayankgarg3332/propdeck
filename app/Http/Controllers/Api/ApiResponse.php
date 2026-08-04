@@ -41,6 +41,7 @@ trait ApiResponse
             'frequency' => $proposal->frequency,
             'extrasHeading' => $proposal->extras_heading,
             'extrasText' => $proposal->extras_text,
+            'paymentLink' => $proposal->payment_link,
             'contentBlocks' => $proposal->content_blocks,
             'lineItemsSnapshot' => $proposal->line_items_snapshot,
             'statusUpdatedAt' => $proposal->status_updated_at?->toIso8601String(),

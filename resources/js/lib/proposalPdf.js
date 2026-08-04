@@ -85,7 +85,7 @@ function sanitizeForPdf(text) {
     .trim();
 }
 
-export function downloadProposalPdf({ proposal, client, settings, rep, creatorSettings, lineItems, totals, frequency, upiQrDataUrl = null }) {
+export function downloadProposalPdf({ proposal, client, settings, rep, creatorSettings, lineItems, totals, frequency, upiQrDataUrl = null, paymentLink = null }) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
@@ -106,6 +106,7 @@ export function downloadProposalPdf({ proposal, client, settings, rep, creatorSe
       : (settings?.defaults?.terms?.length
           ? [{ id: "terms_legacy", title: "Terms & Conditions", content: settings.defaults.terms }]
           : []));
+  const resolvedPaymentLink = paymentLink || proposal.paymentLink || null;
   const gstRate = settings?.defaults?.gstRate || 18;
   const validityDays = settings?.defaults?.validityDays || 7;
   const freqLabel = frequency || "monthly";
@@ -551,6 +552,19 @@ export function downloadProposalPdf({ proposal, client, settings, rep, creatorSe
   }
 
   y += boxH + 18;
+
+  // ── PAY NOW BUTTON ───────────────────────────────────────
+  if (resolvedPaymentLink) {
+    need(52);
+    const btnW = 160;
+    const btnH = 32;
+    const btnX = M + (CW - btnW) / 2;
+    doc.setFillColor(ac);
+    doc.roundedRect(btnX, y, btnW, btnH, 6, 6, "F");
+    txt("Pay Now", btnX + btnW / 2, y + 21, { size: 11, bold: true, color: acos, align: "center" });
+    doc.link(btnX, y, btnW, btnH, { url: resolvedPaymentLink });
+    y += btnH + 18;
+  }
 
   // ── KYC ──────────────────────────────────────────────────
   if (kyc.length > 0) {

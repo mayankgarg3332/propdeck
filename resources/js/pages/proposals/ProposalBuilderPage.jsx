@@ -129,6 +129,7 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
       frequency,
       extrasHeading: extrasHeading.trim(),
       extrasText: extrasText.trim(),
+      paymentLink: paymentLink.trim() || null,
       contentBlocks,
       lineItemsSnapshot: lineItems.map((item) => ({
         productName: item.product.name,
@@ -196,6 +197,7 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
         extrasHeading: extrasHeading.trim(),
         extrasText: extrasText.trim(),
         contentBlocks,
+        paymentLink: paymentLink.trim() || null,
       },
       client,
       settings: data.settings,

@@ -57,6 +57,7 @@ export function ProposalsPage({ data, reload }) {
       totals: totalsFromProposal(proposal),
       frequency: proposal.frequency,
       upiQrDataUrl,
+      paymentLink: proposal.paymentLink || null,
     });
   };
 

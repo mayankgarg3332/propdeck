@@ -117,6 +117,7 @@ export function DashboardPage({ data, reload, navigate, openNewProposal }) {
             totals: totalsFromProposal(proposal),
             frequency: proposal.frequency,
             upiQrDataUrl,
+            paymentLink: proposal.paymentLink || null,
           })}
         />
       </div>
@@ -141,6 +142,7 @@ export function DashboardPage({ data, reload, navigate, openNewProposal }) {
               totals: totalsFromProposal(proposal),
               frequency: proposal.frequency,
               upiQrDataUrl,
+              paymentLink: proposal.paymentLink || null,
             });
           }}
         />

@@ -7,6 +7,8 @@ import { generateUpiQr } from "../../lib/proposalEmail.js";
 import { ProposalDetailModal } from "../proposals/ProposalDetailModal.jsx";
 import { ResendEmailModal } from "../proposals/ResendEmailModal.jsx";
 import { usePermissions } from "../../hooks/usePermissions.js";
+import { useAuth } from "../../contexts/AuthContext.jsx";
+import { api } from "../../services/api.js";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -49,6 +51,7 @@ function computeStats(proposals, settings) {
 
 export function DashboardPage({ data, reload, navigate, openNewProposal }) {
   const perms = usePermissions();
+  const { user: authUser } = useAuth();
   const [viewingProposal, setViewingProposal] = useState(null);
   const [resendProposal, setResendProposal] = useState(null);
   const [upiQrDataUrl, setUpiQrDataUrl] = useState(null);
@@ -108,17 +111,13 @@ export function DashboardPage({ data, reload, navigate, openNewProposal }) {
           limit={6}
           onView={setViewingProposal}
           onResend={perms.canWrite("proposals") ? setResendProposal : null}
-          onPdf={(proposal) => downloadProposalPdf({
-            proposal,
-            client: data.clients.find((client) => client.id === proposal.clientId),
-            settings: data.settings,
-            rep: data.rep,
-            lineItems: lineItemsFromProposal(proposal),
-            totals: totalsFromProposal(proposal),
-            frequency: proposal.frequency,
-            upiQrDataUrl,
-            paymentLink: proposal.paymentLink || null,
-          })}
+          onPdf={(proposal) => {
+            const lineItems = lineItemsFromProposal(proposal);
+            const totals = totalsFromProposal(proposal);
+            const client = data.clients.find((c) => c.id === proposal.clientId);
+            downloadProposalPdf({ proposal, client, settings: data.settings, rep: data.rep, lineItems, totals, frequency: proposal.frequency, upiQrDataUrl, paymentLink: proposal.paymentLink || null });
+            api.notifyPdfDownload({ proposalId: proposal.id, clientName: client?.agency || "", clientEmail: client?.email || "", date: proposal.date || "", lineItems, totals, frequency: proposal.frequency || "", downloadedBy: authUser?.name || "" }).catch(() => {});
+          }}
         />
       </div>
 
@@ -144,6 +143,10 @@ export function DashboardPage({ data, reload, navigate, openNewProposal }) {
               upiQrDataUrl,
               paymentLink: proposal.paymentLink || null,
             });
+            const lineItems2 = lineItemsFromProposal(proposal);
+            const totals2 = totalsFromProposal(proposal);
+            const client2 = data.clients.find((c) => c.id === proposal.clientId);
+            api.notifyPdfDownload({ proposalId: proposal.id, clientName: client2?.agency || "", clientEmail: client2?.email || "", date: proposal.date || "", lineItems: lineItems2, totals: totals2, frequency: proposal.frequency || "", downloadedBy: authUser?.name || "" }).catch(() => {});
           }}
         />
       )}

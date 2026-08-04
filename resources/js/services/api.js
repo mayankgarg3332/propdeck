@@ -114,6 +114,8 @@ export const api = {
   deleteProposal: (id) => request(`/proposals/${id}`, { method: "DELETE" }),
   sendProposalEmail: (payload) =>
     request("/proposals/send-email", { method: "POST", body: JSON.stringify(payload) }),
+  notifyPdfDownload: (payload) =>
+    request("/proposals/pdf-notify", { method: "POST", body: JSON.stringify(payload) }),
   saveSettings: (settings) =>
     request("/settings", { method: "PUT", body: JSON.stringify(settings) }),
 };

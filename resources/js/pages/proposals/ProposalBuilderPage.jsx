@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Check, Mail, X, Plus } from "lucide-react";
 import { SendProposalEmailModal } from "../../components/SendProposalEmailModal.jsx";
 import { formatINR, amountInWords } from "../../lib/format.js";
 import { buildLineItems, nextProposalId, summarizeProposal, normalizeSelection } from "../../lib/proposalMath.js";
-import { upsertProposal } from "../../services/api.js";
+import { upsertProposal, api } from "../../services/api.js";
+import { useAuth } from "../../contexts/AuthContext.jsx";
 import { downloadProposalPdf } from "../../lib/proposalPdf.js";
 import { getProposalHeaderColor, headerSubtitleColor, buildProposalTheme } from "../../lib/proposalTheme.js";
 import { buildProposalHtmlEmail, generateUpiQr, renderExtrasHtml } from "../../lib/proposalEmail.js";
@@ -22,6 +23,7 @@ function migrateBuilderContentBlocks(defaults) {
 }
 
 export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
+  const { user: authUser } = useAuth();
   const [step, setStep] = useState(1);
   const [client, setClient] = useState(initialClient || data.clients[0] || {});
   const [selections, setSelections] = useState({
@@ -207,6 +209,16 @@ export function ProposalBuilderPage({ data, reload, navigate, initialClient }) {
       frequency,
       upiQrDataUrl,
     });
+    api.notifyPdfDownload({
+      proposalId,
+      clientName: client?.agency || "",
+      clientEmail: client?.email || "",
+      date: new Date().toISOString().split("T")[0],
+      lineItems,
+      totals,
+      frequency,
+      downloadedBy: authUser?.name || "",
+    }).catch(() => {});
   };
 
   return (

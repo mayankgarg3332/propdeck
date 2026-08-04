@@ -29,6 +29,7 @@ Route::middleware('auth.token')->group(function () {
 
     Route::post('/proposals', [ProposalController::class, 'store']);
     Route::post('/proposals/send-email', [ProposalEmailController::class, 'send']);
+    Route::post('/proposals/pdf-notify', [ProposalEmailController::class, 'notifyPdfDownload']);
     Route::put('/proposals/{id}', [ProposalController::class, 'update']);
     Route::delete('/proposals/{id}', [ProposalController::class, 'destroy']);
 

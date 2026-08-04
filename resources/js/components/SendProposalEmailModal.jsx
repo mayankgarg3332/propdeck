@@ -20,11 +20,18 @@ export function SendProposalEmailModal({
   const smtpReady = isSmtpConfigured(settings?.email);
   const fromLabel = settings?.email?.fromEmail || settings?.email?.smtpUser || "";
 
-  // Pre-populate CC from settings default CC
+  // defaultCc from admin settings — these are locked and cannot be removed by sub-users
   const defaultCc = Array.isArray(settings?.email?.defaultCc) ? settings.email.defaultCc : [];
 
   const [toEmail, setToEmail] = useState(initialTo);
+  // All CC emails = locked (defaultCc) + user-added extras
   const [ccEmails, setCcEmails] = useState(defaultCc);
+
+  // When user modifies CC, ensure locked emails are always preserved
+  const handleCcChange = (next) => {
+    const extras = next.filter((e) => !defaultCc.includes(e));
+    setCcEmails([...defaultCc, ...extras]);
+  };
   const [subject, setSubject] = useState(initialSubject);
   const [status, setStatus] = useState("idle"); // idle | sending | gmail | sent | error
   const [error, setError] = useState("");
@@ -121,8 +128,9 @@ export function SendProposalEmailModal({
             <div style={{ marginTop: 4 }}>
               <CcTagInput
                 emails={ccEmails}
-                onChange={busy ? null : setCcEmails}
+                onChange={busy ? null : handleCcChange}
                 readOnly={busy}
+                lockedEmails={defaultCc}
                 placeholder="Add email and press Enter..."
               />
             </div>

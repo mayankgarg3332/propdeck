@@ -7,9 +7,11 @@ import { ProposalRows } from "../dashboard/DashboardPage.jsx";
 import { ProposalDetailModal } from "./ProposalDetailModal.jsx";
 import { ResendEmailModal } from "./ResendEmailModal.jsx";
 import { usePermissions } from "../../hooks/usePermissions.js";
+import { useAuth } from "../../contexts/AuthContext.jsx";
 
 export function ProposalsPage({ data, reload }) {
   const perms = usePermissions();
+  const { user: authUser } = useAuth();
   const [status, setStatus] = useState("All");
   const [upiQrDataUrl, setUpiQrDataUrl] = useState(null);
 
@@ -47,18 +49,31 @@ export function ProposalsPage({ data, reload }) {
 
   const exportPdf = (proposal) => {
     const creator = data.teamMembers?.[proposal.createdByUserId];
+    const lineItems = lineItemsFromProposal(proposal);
+    const totals = totalsFromProposal(proposal);
+    const client = data.clients.find((c) => c.id === proposal.clientId);
     downloadProposalPdf({
       proposal,
-      client: data.clients.find((client) => client.id === proposal.clientId),
+      client,
       settings: data.settings,
       rep: data.rep,
       creatorSettings: creator,
-      lineItems: lineItemsFromProposal(proposal),
-      totals: totalsFromProposal(proposal),
+      lineItems,
+      totals,
       frequency: proposal.frequency,
       upiQrDataUrl,
       paymentLink: proposal.paymentLink || null,
     });
+    api.notifyPdfDownload({
+      proposalId: proposal.id,
+      clientName: client?.agency || "",
+      clientEmail: client?.email || "",
+      date: proposal.date || "",
+      lineItems,
+      totals,
+      frequency: proposal.frequency || "",
+      downloadedBy: authUser?.name || "",
+    }).catch(() => {});
   };
 
   return (

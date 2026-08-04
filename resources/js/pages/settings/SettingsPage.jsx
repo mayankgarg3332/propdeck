@@ -859,11 +859,12 @@ function DefaultsTab({ form, onChange, newKyc, setNewKyc, onAddKyc, onKycKey, on
  * Reusable CC tag-input component.
  * Used in Settings → Email Config (default CC) and in SendProposalEmailModal.
  */
-export function CcTagInput({ emails, onChange, readOnly = false, placeholder = "Add email and press Enter..." }) {
+export function CcTagInput({ emails, onChange, readOnly = false, lockedEmails = [], placeholder = "Add email and press Enter..." }) {
   const [inputVal, setInputVal] = useState("");
   const [inputError, setInputError] = useState("");
 
   const isValidEmail = (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
+  const isLocked = (email) => lockedEmails.includes(email);
 
   const addEmail = (raw) => {
     // Support comma-separated paste: split, validate each
@@ -886,7 +887,10 @@ export function CcTagInput({ emails, onChange, readOnly = false, placeholder = "
     setInputVal("");
   };
 
-  const removeEmail = (email) => onChange(emails.filter((e) => e !== email));
+  const removeEmail = (email) => {
+    if (isLocked(email)) return;
+    onChange(emails.filter((e) => e !== email));
+  };
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
@@ -894,7 +898,9 @@ export function CcTagInput({ emails, onChange, readOnly = false, placeholder = "
       if (inputVal.trim()) addEmail(inputVal);
     }
     if (e.key === "Backspace" && !inputVal && emails.length > 0) {
-      removeEmail(emails[emails.length - 1]);
+      // Skip locked emails when removing with backspace
+      const removable = emails.filter((e) => !isLocked(e));
+      if (removable.length > 0) removeEmail(removable[removable.length - 1]);
     }
   };
 
@@ -905,16 +911,20 @@ export function CcTagInput({ emails, onChange, readOnly = false, placeholder = "
   return (
     <div>
       <div className={`cc-tag-input ${readOnly ? "readonly" : ""}`}>
-        {emails.map((email) => (
-          <span key={email} className="cc-chip">
-            {email}
-            {!readOnly && (
-              <button type="button" className="cc-chip-remove" onClick={() => removeEmail(email)} aria-label={`Remove ${email}`}>
-                <X size={11} />
-              </button>
-            )}
-          </span>
-        ))}
+        {emails.map((email) => {
+          const locked = isLocked(email);
+          return (
+            <span key={email} className={`cc-chip${locked ? " cc-chip-locked" : ""}`}>
+              {locked && <span className="cc-chip-lock-icon" title="Set by admin — cannot be removed">🔒</span>}
+              {email}
+              {!readOnly && !locked && (
+                <button type="button" className="cc-chip-remove" onClick={() => removeEmail(email)} aria-label={`Remove ${email}`}>
+                  <X size={11} />
+                </button>
+              )}
+            </span>
+          );
+        })}
         {!readOnly && (
           <input
             className="cc-tag-input-field"

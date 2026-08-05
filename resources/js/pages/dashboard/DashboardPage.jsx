@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FileText, IndianRupee, PlusCircle, CheckCircle2, Mail, FileDown, MessageCircle, Eye } from "lucide-react";
+import { FileText, IndianRupee, PlusCircle, CheckCircle2, Mail, FileDown, MessageCircle, Eye, RotateCw, Trash2 } from "lucide-react";
 import { formatDate, formatDateTime, formatINR } from "../../lib/format.js";
 import { getStatusStyle, getStatusesByRole, getProposalStatuses } from "../../lib/proposalStatuses.js";
 import { downloadProposalPdf, lineItemsFromProposal, totalsFromProposal } from "../../lib/proposalPdf.js";
@@ -267,98 +267,120 @@ export function ProposalRows({ data, limit, editableStatuses, onStatusChange, on
   const showSentBy = Boolean(teamMembers && Object.keys(teamMembers).length > 1);
 
   return (
-    <table className="table">
-      <thead>
-        <tr>
-          <th>Proposal ID</th>
-          <th>Client</th>
-          <th>Products</th>
-          <th>Amount</th>
-          <th>Status</th>
-          <th>Date</th>
-          <th>Activity</th>
-          {showSentBy && <th>Sent by</th>}
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((proposal) => {
-          const style = getStatusStyle(proposal.status, data.settings);
-          const creatorName = showSentBy
-            ? resolveCreatorName(proposal.createdByUserId, teamMembers, null)
-            : null;
+    <div className="table-scroll">
+      <table className="table">
+        <thead>
+          <tr>
+            <th className="col-id">Proposal ID</th>
+            <th className="col-client">Client</th>
+            <th className="col-products">Products</th>
+            <th className="col-amount">Amount</th>
+            <th className="col-status">Status</th>
+            <th className="col-date">Date</th>
+            <th className="col-activity">Activity</th>
+            {showSentBy && <th className="col-sentby">Sent by</th>}
+            <th className="col-actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((proposal) => {
+            const style = getStatusStyle(proposal.status, data.settings);
+            const creatorName = showSentBy
+              ? resolveCreatorName(proposal.createdByUserId, teamMembers, null)
+              : null;
+            const products = proposal.products || [];
+            const extraProductsCount = products.length - 1;
 
-          return (
-            <tr key={proposal.id}>
-              <td><strong className="proposal-id">{proposal.id}</strong></td>
-              <td>
-                <strong>{proposal.client?.agency}</strong>
-                <div className="muted">{proposal.client?.contact}</div>
-              </td>
-              <td className="muted">{proposal.products.join(", ")}</td>
-              <td><strong>{formatINR(proposal.amount)}</strong></td>
-              <td>
-                {onStatusChange ? (
-                  <select
-                    className="status-select"
-                    style={style}
-                    value={proposal.status}
-                    onChange={(event) => onStatusChange(proposal, event.target.value)}
-                  >
-                    {(editableStatuses || []).map((s) => (
-                      <option key={s.value ?? s} value={s.value ?? s}>{s.label ?? s}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <span className="status-pill" style={style}>{proposal.status}</span>
-                )}
-              </td>
-              <td className="muted">
-                {(() => {
-                  const dt = formatDateTime(proposal.createdAt);
-                  return dt ? (
-                    <><span>{dt.date}</span><div style={{ fontSize: 11, color: "#9ca3af" }}>{dt.time}</div></>
-                  ) : formatDate(proposal.date);
-                })()}
-              </td>
-              <td>
-                <ActivityBadges activity={proposal.activity} />
-              </td>
-              {showSentBy && (
-                <td className="muted">
-                  {creatorName ? (
-                    <span style={creatorName === "Deleted user" ? { color: "#9ca3af", fontStyle: "italic" } : {}}>
-                      {creatorName}
-                    </span>
+            return (
+              <tr key={proposal.id}>
+                <td className="col-id"><strong className="proposal-id">{proposal.id}</strong></td>
+                <td className="col-client">
+                  <strong>{proposal.client?.agency}</strong>
+                  <div className="muted">{proposal.client?.contact}</div>
+                </td>
+                <td className="muted col-products">
+                  <div className="products-cell" title={products.join(", ")}>
+                    <span className="products-primary">{products[0]}</span>
+                    {extraProductsCount > 0 && <span className="products-more">+{extraProductsCount}</span>}
+                  </div>
+                </td>
+                <td className="col-amount"><strong>{formatINR(proposal.amount)}</strong></td>
+                <td className="col-status">
+                  {onStatusChange ? (
+                    <select
+                      className="status-select"
+                      style={style}
+                      value={proposal.status}
+                      onChange={(event) => onStatusChange(proposal, event.target.value)}
+                    >
+                      {(editableStatuses || []).map((s) => (
+                        <option key={s.value ?? s} value={s.value ?? s}>{s.label ?? s}</option>
+                      ))}
+                    </select>
                   ) : (
-                    <span style={{ color: "#9ca3af" }}>—</span>
+                    <span className="status-pill" style={style}>{proposal.status}</span>
                   )}
                 </td>
-              )}
-              <td>
-                <div className="row-actions">
-                  <button onClick={() => onView?.(proposal)}>View</button>
-                  {onResend && <button onClick={() => onResend(proposal)}>Resend</button>}
-                  <button onClick={() => onPdf?.(proposal)}>PDF</button>
-                  {onWhatsApp && (
-                    <button
-                      onClick={() => onWhatsApp(proposal)}
-                      title={
-                        formatWhatsAppPhone(proposal.client?.phone)
-                          ? undefined
-                          : "No valid phone on file — you'll pick a contact in WhatsApp"
-                      }
-                    >
-                      <MessageCircle size={13} /> WhatsApp
+                <td className="muted col-date">
+                  {(() => {
+                    const dt = formatDateTime(proposal.createdAt);
+                    return dt ? (
+                      <><span>{dt.date}</span><div style={{ fontSize: 11, color: "#9ca3af" }}>{dt.time}</div></>
+                    ) : formatDate(proposal.date);
+                  })()}
+                </td>
+                <td className="col-activity">
+                  <ActivityBadges activity={proposal.activity} />
+                </td>
+                {showSentBy && (
+                  <td className="muted col-sentby">
+                    {creatorName ? (
+                      <span style={creatorName === "Deleted user" ? { color: "#9ca3af", fontStyle: "italic" } : {}}>
+                        {creatorName}
+                      </span>
+                    ) : (
+                      <span style={{ color: "#9ca3af" }}>—</span>
+                    )}
+                  </td>
+                )}
+                <td className="col-actions">
+                  <div className="row-actions">
+                    <button className="icon-btn" onClick={() => onView?.(proposal)} title="View">
+                      <Eye size={15} />
                     </button>
-                  )}
-                  {onDelete && <button className="danger-action" onClick={() => onDelete(proposal)}>Delete</button>}
-                </div>
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+                    {onResend && (
+                      <button className="icon-btn" onClick={() => onResend(proposal)} title="Resend">
+                        <RotateCw size={15} />
+                      </button>
+                    )}
+                    <button className="icon-btn" onClick={() => onPdf?.(proposal)} title="Download PDF">
+                      <FileDown size={15} />
+                    </button>
+                    {onWhatsApp && (
+                      <button
+                        className="icon-btn"
+                        onClick={() => onWhatsApp(proposal)}
+                        title={
+                          formatWhatsAppPhone(proposal.client?.phone)
+                            ? "Share via WhatsApp"
+                            : "No valid phone on file — you'll pick a contact in WhatsApp"
+                        }
+                      >
+                        <MessageCircle size={15} />
+                      </button>
+                    )}
+                    {onDelete && (
+                      <button className="icon-btn danger-action" onClick={() => onDelete(proposal)} title="Delete">
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

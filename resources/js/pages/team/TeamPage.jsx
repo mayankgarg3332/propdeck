@@ -207,7 +207,7 @@ export function TeamPage() {
       email: member.email,
       password: "",
       password_confirmation: "",
-      is_admin: Boolean(member.is_admin),
+      is_admin: Boolean(member.isAdmin),
       permissions: { ...emptyForm.permissions, ...(member.permissions || {}) },
     });
     setModalError("");
@@ -352,7 +352,7 @@ export function TeamPage() {
                       </div>
                     </td>
                     <td>
-                      {member.is_admin ? (
+                      {member.isAdmin ? (
                         <span className="perm-badge perm-badge-write">Admin</span>
                       ) : (
                         <span className="perm-badge perm-badge-none">—</span>

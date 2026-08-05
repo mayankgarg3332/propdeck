@@ -1,4 +1,5 @@
-import { Boxes, FileText, Home, Plus, Settings, UserCog, Users } from "lucide-react";
+import { useState } from "react";
+import { Boxes, ChevronLeft, ChevronRight, FileText, Home, Plus, Settings, UserCog, Users } from "lucide-react";
 import { usePermissions } from "../hooks/usePermissions.js";
 
 const navItems = [
@@ -11,8 +12,11 @@ const navItems = [
   { path: "/settings", label: "Settings", icon: Settings, settingsNav: true },
 ];
 
+const COLLAPSE_STORAGE_KEY = "propdeck.sidebarCollapsed";
+
 export function Sidebar({ currentPath, onNavigate, onNewProposal, rep, settings, user }) {
   const perms = usePermissions();
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_STORAGE_KEY) === "1");
   const displayName = user?.name || settings?.company?.signatory || rep?.name || "—";
   const displayRole = user?.email || settings?.company?.designation || rep?.role || "Sales Rep";
   const initials = displayName
@@ -21,11 +25,27 @@ export function Sidebar({ currentPath, onNavigate, onNewProposal, rep, settings,
     .join("")
     .toUpperCase();
 
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem(COLLAPSE_STORAGE_KEY, next ? "1" : "0");
+      return next;
+    });
+  };
+
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${collapsed ? "sidebar-collapsed" : ""}`}>
+      <button
+        type="button"
+        className="sidebar-collapse-toggle"
+        onClick={toggleCollapsed}
+        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      >
+        {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+      </button>
       <div className="sidebar-logo">
-        <div className="brand">Propdeck</div>
-        <div className="brand-subtitle">Proposal Studio</div>
+        <div className="brand">{collapsed ? "P" : "Propdeck"}</div>
+        {!collapsed && <div className="brand-subtitle">Proposal Studio</div>}
       </div>
       <nav className="sidebar-nav">
         {navItems.map((item) => {
@@ -41,19 +61,22 @@ export function Sidebar({ currentPath, onNavigate, onNewProposal, rep, settings,
               key={item.path}
               className={`sidebar-item ${active ? "active" : ""} ${item.cta ? "cta" : ""}`}
               onClick={() => (item.cta ? onNewProposal() : onNavigate(item.path))}
+              title={collapsed ? item.label : undefined}
             >
               <Icon size={17} />
-              <span>{item.label}</span>
+              {!collapsed && <span>{item.label}</span>}
             </button>
           );
         })}
       </nav>
-      <div className="sidebar-user">
+      <div className="sidebar-user" title={collapsed ? `${displayName} · ${displayRole}` : undefined}>
         <div className="avatar">{initials}</div>
-        <div>
-          <div className="user-name">{displayName}</div>
-          <div className="user-role">{displayRole}</div>
-        </div>
+        {!collapsed && (
+          <div>
+            <div className="user-name">{displayName}</div>
+            <div className="user-role">{displayRole}</div>
+          </div>
+        )}
       </div>
     </aside>
   );

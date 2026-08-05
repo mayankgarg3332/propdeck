@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Mail, ExternalLink, FileDown, MessageCircle, Eye } from "lucide-react";
+import { Mail, ExternalLink, FileDown, MessageCircle, Eye, Copy, Check, CheckCircle2, XCircle } from "lucide-react";
 import { formatDate, formatINR, getStatusStyle } from "../../lib/format.js";
 import { api } from "../../services/api.js";
 import { formatWhatsAppPhone } from "../../lib/whatsapp.js";
+import { buildProposalHtmlEmail, lineItemsFromSnapshot, totalsFromProposal } from "../../lib/proposalEmail.js";
 
 const EVENT_META = {
   emailed: { icon: Mail, label: "Emailed via SMTP" },
@@ -10,6 +11,8 @@ const EVENT_META = {
   pdf_downloaded: { icon: FileDown, label: "PDF downloaded" },
   whatsapp_shared: { icon: MessageCircle, label: "Shared via WhatsApp" },
   link_viewed: { icon: Eye, label: "Public link opened by client" },
+  client_accepted: { icon: CheckCircle2, label: "Client accepted the proposal" },
+  client_rejected: { icon: XCircle, label: "Client rejected the proposal" },
 };
 
 function ProposalActivity({ proposalId }) {
@@ -63,6 +66,9 @@ function ProposalActivity({ proposalId }) {
 }
 
 export function ProposalDetailModal({ proposal, client, rep, settings, teamMembers, onClose, onPdf, onWhatsApp }) {
+  const [showEmailPreview, setShowEmailPreview] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+
   if (!proposal) return null;
   const statusStyle = getStatusStyle(proposal.status);
 
@@ -72,6 +78,30 @@ export function ProposalDetailModal({ proposal, client, rep, settings, teamMembe
   const creator = teamMembers?.[proposal.createdByUserId];
   const preparedBy = creator?.signatory || settings?.company?.signatory || rep?.name || proposal.repId || "—";
   const phone = creator?.phone || settings?.company?.phone || rep?.phone || "—";
+
+  const copyLink = async () => {
+    if (!proposal.publicUrl) return;
+    await navigator.clipboard.writeText(proposal.publicUrl);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
+
+  const emailHtml = showEmailPreview
+    ? buildProposalHtmlEmail({
+        client,
+        proposalId: proposal.id,
+        lineItems: lineItemsFromSnapshot(proposal),
+        totals: totalsFromProposal(proposal),
+        paymentLink: proposal.paymentLink || "",
+        frequency: proposal.frequency || "monthly",
+        extrasHeading: proposal.extrasHeading || "",
+        extrasText: proposal.extrasText || "",
+        contentBlocks: proposal.contentBlocks || null,
+        settings,
+        rep,
+        proposalDate: proposal.date,
+      })
+    : "";
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -105,6 +135,27 @@ export function ProposalDetailModal({ proposal, client, rep, settings, teamMembe
         </div>
 
         <section className="proposal-detail-section">
+          <h3>Proposal Link</h3>
+          {proposal.publicUrl ? (
+            <div className="proposal-link-row">
+              <a
+                href={proposal.publicUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="proposal-link-text"
+              >
+                {proposal.publicUrl}
+              </a>
+              <button type="button" className="button" onClick={copyLink}>
+                {linkCopied ? <Check size={14} /> : <Copy size={14} />} {linkCopied ? "Copied" : "Copy"}
+              </button>
+            </div>
+          ) : (
+            <p className="muted">No public link generated yet — send this proposal to generate one.</p>
+          )}
+        </section>
+
+        <section className="proposal-detail-section">
           <h3>Products</h3>
           <ul>
             {proposal.products.map((product) => <li key={product}>{product}</li>)}
@@ -114,6 +165,22 @@ export function ProposalDetailModal({ proposal, client, rep, settings, teamMembe
         <section className="proposal-detail-section">
           <h3>Payment</h3>
           <p>{settings?.payment?.bank} · {settings?.payment?.account} · {settings?.payment?.ifsc}</p>
+        </section>
+
+        <section className="proposal-detail-section">
+          <div className="proposal-email-preview-header">
+            <h3>Email Content</h3>
+            <button type="button" className="button" onClick={() => setShowEmailPreview((v) => !v)}>
+              <Mail size={14} /> {showEmailPreview ? "Hide email" : "View email"}
+            </button>
+          </div>
+          {showEmailPreview && (
+            <iframe
+              title={`Email content for ${proposal.id}`}
+              srcDoc={emailHtml}
+              className="proposal-email-iframe"
+            />
+          )}
         </section>
 
         <section className="proposal-detail-section">

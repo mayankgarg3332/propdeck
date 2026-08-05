@@ -21,6 +21,10 @@ class ProposalEvent extends Model
 
     const TYPE_PUBLIC_VIEWED = 'link_viewed';
 
+    const TYPE_CLIENT_ACCEPTED = 'client_accepted';
+
+    const TYPE_CLIENT_REJECTED = 'client_rejected';
+
     protected function casts(): array
     {
         return [

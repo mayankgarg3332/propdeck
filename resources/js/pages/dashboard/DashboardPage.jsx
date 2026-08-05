@@ -221,29 +221,38 @@ function ActivityBadges({ activity }) {
   if (viewedCount) viewedParts.push(`Opened by client: ${viewedCount}`);
   if (activity.linkViewed?.lastAt) viewedParts.push(`Last: ${formatActivityTime(activity.linkViewed.lastAt)}`);
 
+  const emailTooltip = emailParts.join(" · ") || "Not emailed yet";
+  const pdfTooltip = pdfParts.join(" · ") || "PDF not downloaded yet";
+  const whatsappTooltip = whatsappParts.join(" · ") || "Not shared via WhatsApp yet";
+  const viewedTooltip = viewedParts.join(" · ") || "Client hasn't opened the link yet";
+
   return (
     <div className="activity-badges">
       <span
-        className={`activity-badge ${emailedCount ? "activity-badge-active" : "activity-badge-muted"}`}
-        title={emailParts.join(" · ") || "Not emailed yet"}
+        className={`activity-badge tooltip ${emailedCount ? "activity-badge-active" : "activity-badge-muted"}`}
+        data-tooltip={emailTooltip}
+        aria-label={emailTooltip}
       >
         <Mail size={13} />
       </span>
       <span
-        className={`activity-badge ${pdfCount ? "activity-badge-active" : "activity-badge-muted"}`}
-        title={pdfParts.join(" · ") || "PDF not downloaded yet"}
+        className={`activity-badge tooltip ${pdfCount ? "activity-badge-active" : "activity-badge-muted"}`}
+        data-tooltip={pdfTooltip}
+        aria-label={pdfTooltip}
       >
         <FileDown size={13} />
       </span>
       <span
-        className={`activity-badge ${whatsappCount ? "activity-badge-active" : "activity-badge-muted"}`}
-        title={whatsappParts.join(" · ") || "Not shared via WhatsApp yet"}
+        className={`activity-badge tooltip ${whatsappCount ? "activity-badge-active" : "activity-badge-muted"}`}
+        data-tooltip={whatsappTooltip}
+        aria-label={whatsappTooltip}
       >
         <MessageCircle size={13} />
       </span>
       <span
-        className={`activity-badge ${viewedCount ? "activity-badge-active" : "activity-badge-muted"}`}
-        title={viewedParts.join(" · ") || "Client hasn't opened the link yet"}
+        className={`activity-badge tooltip ${viewedCount ? "activity-badge-active" : "activity-badge-muted"}`}
+        data-tooltip={viewedTooltip}
+        aria-label={viewedTooltip}
       >
         <Eye size={13} />
       </span>
@@ -299,7 +308,7 @@ export function ProposalRows({ data, limit, editableStatuses, onStatusChange, on
                   <div className="muted">{proposal.client?.contact}</div>
                 </td>
                 <td className="muted col-products">
-                  <div className="products-cell" title={products.join(", ")}>
+                  <div className="products-cell tooltip" data-tooltip={products.join(", ")}>
                     <span className="products-primary">{products[0]}</span>
                     {extraProductsCount > 0 && <span className="products-more">+{extraProductsCount}</span>}
                   </div>
@@ -345,32 +354,34 @@ export function ProposalRows({ data, limit, editableStatuses, onStatusChange, on
                 )}
                 <td className="col-actions">
                   <div className="row-actions">
-                    <button className="icon-btn" onClick={() => onView?.(proposal)} title="View">
+                    <button className="icon-btn tooltip" onClick={() => onView?.(proposal)} data-tooltip="View" aria-label="View">
                       <Eye size={15} />
                     </button>
                     {onResend && (
-                      <button className="icon-btn" onClick={() => onResend(proposal)} title="Resend">
+                      <button className="icon-btn tooltip" onClick={() => onResend(proposal)} data-tooltip="Resend" aria-label="Resend">
                         <RotateCw size={15} />
                       </button>
                     )}
-                    <button className="icon-btn" onClick={() => onPdf?.(proposal)} title="Download PDF">
+                    <button className="icon-btn tooltip" onClick={() => onPdf?.(proposal)} data-tooltip="Download PDF" aria-label="Download PDF">
                       <FileDown size={15} />
                     </button>
-                    {onWhatsApp && (
-                      <button
-                        className="icon-btn"
-                        onClick={() => onWhatsApp(proposal)}
-                        title={
-                          formatWhatsAppPhone(proposal.client?.phone)
-                            ? "Share via WhatsApp"
-                            : "No valid phone on file — you'll pick a contact in WhatsApp"
-                        }
-                      >
-                        <MessageCircle size={15} />
-                      </button>
-                    )}
+                    {onWhatsApp && (() => {
+                      const whatsappTooltip = formatWhatsAppPhone(proposal.client?.phone)
+                        ? "Share via WhatsApp"
+                        : "No valid phone on file — you'll pick a contact in WhatsApp";
+                      return (
+                        <button
+                          className="icon-btn tooltip"
+                          onClick={() => onWhatsApp(proposal)}
+                          data-tooltip={whatsappTooltip}
+                          aria-label={whatsappTooltip}
+                        >
+                          <MessageCircle size={15} />
+                        </button>
+                      );
+                    })()}
                     {onDelete && (
-                      <button className="icon-btn danger-action" onClick={() => onDelete(proposal)} title="Delete">
+                      <button className="icon-btn tooltip danger-action" onClick={() => onDelete(proposal)} data-tooltip="Delete" aria-label="Delete">
                         <Trash2 size={15} />
                       </button>
                     )}

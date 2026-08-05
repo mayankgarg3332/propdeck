@@ -21,8 +21,8 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
 
-        // Public proposal view-tracking beacon has no session/CSRF context (anonymous client visit).
-        $middleware->validateCsrfTokens(except: ['p/*/viewed']);
+        // Public proposal view-tracking beacon and accept/reject action have no session/CSRF context (anonymous client visit).
+        $middleware->validateCsrfTokens(except: ['p/*/viewed', 'p/*/respond']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

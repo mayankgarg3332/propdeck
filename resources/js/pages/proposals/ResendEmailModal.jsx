@@ -19,6 +19,7 @@ export function ResendEmailModal({ proposal, client, settings, rep, reload, onCl
     frequency: proposal.frequency || "monthly",
     extrasHeading: proposal.extrasHeading || "",
     extrasText: proposal.extrasText || "",
+    contentBlocks: proposal.contentBlocks || null,
     settings,
     rep,
     proposalDate: proposal.date,

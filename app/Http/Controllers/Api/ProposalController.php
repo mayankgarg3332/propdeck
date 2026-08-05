@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Api\Concerns\AuthorizesAccount;
 use App\Models\AppSetting;
 use App\Models\Proposal;
+use App\Models\ProposalEvent;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class ProposalController extends Controller
@@ -39,6 +41,26 @@ class ProposalController extends Controller
         return response()->json(null, 204);
     }
 
+    public function events(Request $request, string $id)
+    {
+        $this->authorizeSection($request, 'proposals', 'read');
+        $proposal = $this->findAccountProposal($request, $id);
+
+        $events = ProposalEvent::with('user')
+            ->where('proposal_id', $proposal->id)
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get();
+
+        return response()->json($events->map(fn (ProposalEvent $event) => [
+            'id' => $event->id,
+            'type' => $event->type,
+            'meta' => $event->meta,
+            'createdAt' => $event->created_at?->toIso8601String(),
+            'userName' => $event->user?->name ?? ($event->user_id ? 'Deleted user' : null),
+        ])->values());
+    }
+
     protected function upsert(Request $request): Proposal
     {
         $accountId = $this->accountUserId($request);
@@ -47,7 +69,7 @@ class ProposalController extends Controller
 
         $clientExistsRule = Rule::exists('clients', 'id')->where(function ($q) use ($accountId, $user) {
             $q->where('user_id', $accountId);
-            if (! $user->isAccountOwner()) {
+            if (! $user->isAdmin()) {
                 $q->where('created_by_user_id', $user->id);
             }
         });
@@ -81,7 +103,7 @@ class ProposalController extends Controller
         $proposal = Proposal::find($proposalId);
 
         if ($proposal && (int) $proposal->user_id === (int) $accountId) {
-            if (! $user->isAccountOwner() && (int) $proposal->created_by_user_id !== (int) $user->id) {
+            if (! $user->isAdmin() && (int) $proposal->created_by_user_id !== (int) $user->id) {
                 abort(403, 'You do not have permission for this proposal.');
             }
         } elseif (Proposal::where('id', $proposalId)->exists()) {
@@ -113,6 +135,9 @@ class ProposalController extends Controller
         ]);
 
         $proposal->user_id = $accountId;
+        if (! $proposal->share_token) {
+            $proposal->share_token = Str::random(32);
+        }
         $proposal->save();
 
         return $proposal->fresh();

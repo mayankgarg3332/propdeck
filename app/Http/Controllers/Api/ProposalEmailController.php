@@ -7,8 +7,10 @@ use App\Http\Controllers\Api\Concerns\AuthorizesAccount;
 use App\Models\AppSetting;
 use App\Models\Client;
 use App\Models\Proposal;
+use App\Models\ProposalEvent;
 use App\Models\User;
 use App\Services\AccountMailer;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
 
@@ -68,10 +70,80 @@ class ProposalEmailController extends Controller
                     'status' => 'Sent',
                     'status_updated_at' => now(),
                 ]);
+
+                ProposalEvent::create([
+                    'proposal_id' => $proposal->id,
+                    'user_id' => $user->id,
+                    'type' => ProposalEvent::TYPE_EMAILED,
+                    'meta' => [
+                        'to' => $data['to'],
+                        'ccCount' => count($cc),
+                    ],
+                ]);
             }
         }
 
         return response()->json(['message' => 'Email sent successfully.']);
+    }
+
+    public function notifyGmailOpen(Request $request)
+    {
+        $this->authorizeSection($request, 'proposals', 'read');
+
+        $data = $request->validate([
+            'proposalId' => 'required|string|max:64',
+            'to'         => 'nullable|email|max:255',
+            'ccCount'    => 'nullable|integer|min:0',
+        ]);
+
+        $user = $this->currentUser($request);
+
+        try {
+            $proposal = $this->findAccountProposal($request, $data['proposalId']);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Tracked.']);
+        }
+
+        ProposalEvent::create([
+            'proposal_id' => $proposal->id,
+            'user_id' => $user->id,
+            'type' => ProposalEvent::TYPE_GMAIL_OPENED,
+            'meta' => [
+                'to' => $data['to'] ?? null,
+                'ccCount' => $data['ccCount'] ?? 0,
+            ],
+        ]);
+
+        return response()->json(['message' => 'Tracked.']);
+    }
+
+    public function notifyWhatsAppShare(Request $request)
+    {
+        $this->authorizeSection($request, 'proposals', 'read');
+
+        $data = $request->validate([
+            'proposalId' => 'required|string|max:64',
+            'to'         => 'nullable|string|max:32',
+        ]);
+
+        $user = $this->currentUser($request);
+
+        try {
+            $proposal = $this->findAccountProposal($request, $data['proposalId']);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Tracked.']);
+        }
+
+        ProposalEvent::create([
+            'proposal_id' => $proposal->id,
+            'user_id' => $user->id,
+            'type' => ProposalEvent::TYPE_WHATSAPP_SHARED,
+            'meta' => [
+                'to' => $data['to'] ?? null,
+            ],
+        ]);
+
+        return response()->json(['message' => 'Tracked.']);
     }
 
     public function notifyPdfDownload(Request $request)
@@ -91,6 +163,22 @@ class ProposalEmailController extends Controller
 
         $user = $this->currentUser($request);
         $accountId = $this->accountUserId($request);
+
+        try {
+            $proposal = $this->findAccountProposal($request, $data['proposalId']);
+
+            ProposalEvent::create([
+                'proposal_id' => $proposal->id,
+                'user_id' => $user->id,
+                'type' => ProposalEvent::TYPE_PDF_DOWNLOADED,
+                'meta' => [
+                    'clientName' => $data['clientName'] ?? null,
+                    'downloadedBy' => $data['downloadedBy'] ?? null,
+                ],
+            ]);
+        } catch (ModelNotFoundException $e) {
+            // Proposal not found/not in scope — nothing to log, notification below is skipped too.
+        }
 
         $accountSettings = AppSetting::findForAccount($accountId);
         $userSettings = AppSetting::findForUser($user->id);

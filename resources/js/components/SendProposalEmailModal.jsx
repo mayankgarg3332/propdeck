@@ -72,8 +72,9 @@ export function SendProposalEmailModal({
   const openInGmail = async () => {
     setError("");
     setStatus("gmail");
+    let idForGmail = proposalId;
     try {
-      await resolveProposalId();
+      idForGmail = await resolveProposalId();
       await navigator.clipboard.write([
         new ClipboardItem({ "text/html": new Blob([htmlBody], { type: "text/html" }) }),
       ]);
@@ -94,6 +95,11 @@ export function SendProposalEmailModal({
       `&su=${encodeURIComponent(subject)}`;
     window.open(gmailUrl, "_blank");
     setStatus("idle");
+    if (idForGmail) {
+      api
+        .notifyGmailOpen({ proposalId: idForGmail, to: toEmail.trim(), ccCount: validCc.length })
+        .catch(() => {});
+    }
     onSent?.("gmail");
   };
 

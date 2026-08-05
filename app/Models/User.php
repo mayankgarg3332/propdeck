@@ -12,7 +12,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
 
-#[Fillable(['name', 'email', 'password', 'api_token', 'parent_user_id'])]
+#[Fillable(['name', 'email', 'password', 'api_token', 'parent_user_id', 'is_admin'])]
 #[Hidden(['password', 'remember_token', 'api_token'])]
 class User extends Authenticatable
 {
@@ -37,6 +37,11 @@ class User extends Authenticatable
     public function isAccountOwner(): bool
     {
         return $this->parent_user_id === null;
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->isAccountOwner() || (bool) $this->is_admin;
     }
 
     public function accountUserId(): int
@@ -118,6 +123,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_admin' => 'boolean',
         ];
     }
 }

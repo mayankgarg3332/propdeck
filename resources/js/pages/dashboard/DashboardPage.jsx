@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
-import { FileText, IndianRupee, PlusCircle, CheckCircle2 } from "lucide-react";
+import { FileText, IndianRupee, PlusCircle, CheckCircle2, Mail, FileDown, MessageCircle, Eye } from "lucide-react";
 import { formatDate, formatDateTime, formatINR } from "../../lib/format.js";
 import { getStatusStyle, getStatusesByRole, getProposalStatuses } from "../../lib/proposalStatuses.js";
 import { downloadProposalPdf, lineItemsFromProposal, totalsFromProposal } from "../../lib/proposalPdf.js";
 import { generateUpiQr } from "../../lib/proposalEmail.js";
+import { resolveCreatorName } from "../../lib/teamMembers.js";
+import { formatWhatsAppPhone, buildWhatsAppMessage, buildWhatsAppShareUrl } from "../../lib/whatsapp.js";
 import { ProposalDetailModal } from "../proposals/ProposalDetailModal.jsx";
 import { ResendEmailModal } from "../proposals/ResendEmailModal.jsx";
 import { usePermissions } from "../../hooks/usePermissions.js";
@@ -69,6 +71,20 @@ export function DashboardPage({ data, reload, navigate, openNewProposal }) {
     { label: "Revenue committed", value: formatINR(revenue), sub: `From ${positiveLabel.toLowerCase()} proposals`, icon: IndianRupee },
   ];
 
+  const shareViaWhatsApp = (proposal) => {
+    const client = data.clients.find((c) => c.id === proposal.clientId);
+    const phoneDigits = formatWhatsAppPhone(client?.phone);
+    const message = buildWhatsAppMessage({
+      clientContact: client?.contact,
+      companyName: data.settings?.company?.name || "PropDeck",
+      proposalId: proposal.id,
+      amountLabel: formatINR(proposal.amount),
+      publicUrl: proposal.publicUrl,
+    });
+    window.open(buildWhatsAppShareUrl(phoneDigits, message), "_blank");
+    api.notifyWhatsAppShare({ proposalId: proposal.id, to: phoneDigits }).catch(() => {});
+  };
+
   return (
     <div className="page">
       <div className="page-header">
@@ -111,6 +127,7 @@ export function DashboardPage({ data, reload, navigate, openNewProposal }) {
           limit={6}
           onView={setViewingProposal}
           onResend={perms.canWrite("proposals") ? setResendProposal : null}
+          onWhatsApp={shareViaWhatsApp}
           onPdf={(proposal) => {
             const lineItems = lineItemsFromProposal(proposal);
             const totals = totalsFromProposal(proposal);
@@ -129,6 +146,7 @@ export function DashboardPage({ data, reload, navigate, openNewProposal }) {
           settings={data.settings}
           teamMembers={data.teamMembers}
           onClose={() => setViewingProposal(null)}
+          onWhatsApp={shareViaWhatsApp}
           onPdf={(proposal) => {
             const creator = data.teamMembers?.[proposal.createdByUserId];
             downloadProposalPdf({
@@ -165,27 +183,75 @@ export function DashboardPage({ data, reload, navigate, openNewProposal }) {
   );
 }
 
-/**
- * Resolve a display name for who created a proposal.
- *
- * teamMembers: { [userId]: { name, email } } — only present for account owners
- * createdByUserId: the user ID stored on the proposal
- * currentUserId: the logged-in user's ID (to show "You" for own proposals)
- *
- * Edge cases:
- *  - createdByUserId is null (old proposals before tracking was added) → "—"
- *  - User has been deleted (id not in teamMembers) → "Deleted user"
- *  - Created by the account owner themselves → owner's name
- */
-function resolveCreatorName(createdByUserId, teamMembers, currentUserId) {
-  if (!createdByUserId) return null; // null = don't show (old proposals)
-  if (!teamMembers) return null;     // not account owner — don't show column
-  const member = teamMembers[createdByUserId];
-  if (!member) return "Deleted user";
-  return member.name || member.email || "Unknown";
+function formatActivityTime(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-export function ProposalRows({ data, limit, editableStatuses, onStatusChange, onDelete, onView, onPdf, onResend }) {
+/**
+ * Compact "did this proposal actually get sent to the customer" indicator.
+ * Emailed (SMTP) is server-verified; Gmail opens are self-reported (the
+ * server can never confirm the user actually hit send in Gmail), so they're
+ * grouped into the same "mail" badge but the tooltip breaks them apart.
+ */
+function ActivityBadges({ activity }) {
+  if (!activity) return <span className="muted">—</span>;
+
+  const emailedCount = (activity.emailed?.count || 0) + (activity.gmailOpened?.count || 0);
+  const pdfCount = activity.pdfDownloaded?.count || 0;
+
+  const emailParts = [];
+  if (activity.emailed?.count) emailParts.push(`Emailed (SMTP): ${activity.emailed.count}`);
+  if (activity.gmailOpened?.count) emailParts.push(`Opened in Gmail (unconfirmed): ${activity.gmailOpened.count}`);
+  const lastEmailAt = [activity.emailed?.lastAt, activity.gmailOpened?.lastAt].filter(Boolean).sort().pop();
+  if (lastEmailAt) emailParts.push(`Last: ${formatActivityTime(lastEmailAt)}`);
+
+  const pdfParts = [];
+  if (pdfCount) pdfParts.push(`PDF downloaded: ${pdfCount}`);
+  if (activity.pdfDownloaded?.lastAt) pdfParts.push(`Last: ${formatActivityTime(activity.pdfDownloaded.lastAt)}`);
+
+  const whatsappCount = activity.whatsappShared?.count || 0;
+  const whatsappParts = [];
+  if (whatsappCount) whatsappParts.push(`Shared via WhatsApp: ${whatsappCount}`);
+  if (activity.whatsappShared?.lastAt) whatsappParts.push(`Last: ${formatActivityTime(activity.whatsappShared.lastAt)}`);
+
+  const viewedCount = activity.linkViewed?.count || 0;
+  const viewedParts = [];
+  if (viewedCount) viewedParts.push(`Opened by client: ${viewedCount}`);
+  if (activity.linkViewed?.lastAt) viewedParts.push(`Last: ${formatActivityTime(activity.linkViewed.lastAt)}`);
+
+  return (
+    <div className="activity-badges">
+      <span
+        className={`activity-badge ${emailedCount ? "activity-badge-active" : "activity-badge-muted"}`}
+        title={emailParts.join(" · ") || "Not emailed yet"}
+      >
+        <Mail size={13} />
+      </span>
+      <span
+        className={`activity-badge ${pdfCount ? "activity-badge-active" : "activity-badge-muted"}`}
+        title={pdfParts.join(" · ") || "PDF not downloaded yet"}
+      >
+        <FileDown size={13} />
+      </span>
+      <span
+        className={`activity-badge ${whatsappCount ? "activity-badge-active" : "activity-badge-muted"}`}
+        title={whatsappParts.join(" · ") || "Not shared via WhatsApp yet"}
+      >
+        <MessageCircle size={13} />
+      </span>
+      <span
+        className={`activity-badge ${viewedCount ? "activity-badge-active" : "activity-badge-muted"}`}
+        title={viewedParts.join(" · ") || "Client hasn't opened the link yet"}
+      >
+        <Eye size={13} />
+      </span>
+    </div>
+  );
+}
+
+export function ProposalRows({ data, limit, editableStatuses, onStatusChange, onDelete, onView, onPdf, onResend, onWhatsApp }) {
   const sortKey = (p) => p.createdAt || (p.date + "T00:00:00");
   const rows = [...data.proposals]
     .sort((a, b) => new Date(sortKey(b)) - new Date(sortKey(a)))
@@ -210,6 +276,7 @@ export function ProposalRows({ data, limit, editableStatuses, onStatusChange, on
           <th>Amount</th>
           <th>Status</th>
           <th>Date</th>
+          <th>Activity</th>
           {showSentBy && <th>Sent by</th>}
           <th>Actions</th>
         </tr>
@@ -254,6 +321,9 @@ export function ProposalRows({ data, limit, editableStatuses, onStatusChange, on
                   ) : formatDate(proposal.date);
                 })()}
               </td>
+              <td>
+                <ActivityBadges activity={proposal.activity} />
+              </td>
               {showSentBy && (
                 <td className="muted">
                   {creatorName ? (
@@ -270,6 +340,18 @@ export function ProposalRows({ data, limit, editableStatuses, onStatusChange, on
                   <button onClick={() => onView?.(proposal)}>View</button>
                   {onResend && <button onClick={() => onResend(proposal)}>Resend</button>}
                   <button onClick={() => onPdf?.(proposal)}>PDF</button>
+                  {onWhatsApp && (
+                    <button
+                      onClick={() => onWhatsApp(proposal)}
+                      title={
+                        formatWhatsAppPhone(proposal.client?.phone)
+                          ? undefined
+                          : "No valid phone on file — you'll pick a contact in WhatsApp"
+                      }
+                    >
+                      <MessageCircle size={13} /> WhatsApp
+                    </button>
+                  )}
                   {onDelete && <button className="danger-action" onClick={() => onDelete(proposal)}>Delete</button>}
                 </div>
               </td>

@@ -37,6 +37,7 @@ class SubUserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:191|unique:users,email',
             'password' => 'required|string|min:8|confirmed',
+            'is_admin' => 'sometimes|boolean',
             'permissions' => 'required|array',
         ], $this->permissionValidationRules(required: true)));
 
@@ -47,6 +48,7 @@ class SubUserController extends Controller
             'email' => $data['email'],
             'password' => $data['password'],
             'parent_user_id' => $owner->id,
+            'is_admin' => $data['is_admin'] ?? false,
         ]);
 
         $this->syncPermissions($subUser, $data['permissions']);
@@ -65,6 +67,7 @@ class SubUserController extends Controller
             'name' => 'sometimes|string|max:255',
             'email' => ['sometimes', 'email', 'max:191', Rule::unique('users', 'email')->ignore($subUser->id)],
             'password' => 'nullable|string|min:8|confirmed',
+            'is_admin' => 'sometimes|boolean',
             'permissions' => 'sometimes|array',
         ], $this->permissionValidationRules(required: false)));
 
@@ -76,6 +79,9 @@ class SubUserController extends Controller
         }
         if (! empty($data['password'])) {
             $subUser->password = $data['password'];
+        }
+        if (array_key_exists('is_admin', $data)) {
+            $subUser->is_admin = $data['is_admin'];
         }
         $subUser->save();
 

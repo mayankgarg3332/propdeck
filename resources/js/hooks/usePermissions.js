@@ -9,9 +9,11 @@ export function usePermissions() {
   const { user } = useAuth();
   const permissions = user?.permissions || {};
   const isAccountOwner = Boolean(user?.isAccountOwner);
+  const isAdmin = Boolean(user?.isAdmin);
 
   return {
     isAccountOwner,
+    isAdmin,
     canRead: (section) => Boolean(permissions[section]?.read),
     canWrite: (section) => Boolean(permissions[section]?.write),
     // Company profile: owner can edit; sub-users can view (read-only) when they can open Settings.

@@ -20,6 +20,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
+
+        // Public proposal view-tracking beacon has no session/CSRF context (anonymous client visit).
+        $middleware->validateCsrfTokens(except: ['p/*/viewed']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

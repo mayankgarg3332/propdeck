@@ -3,6 +3,7 @@ import { Plus, Search, Trash2 } from "lucide-react";
 import { formatINR, getStatusStyle } from "../../lib/format.js";
 import { api } from "../../services/api.js";
 import { usePermissions } from "../../hooks/usePermissions.js";
+import { resolveCreatorName } from "../../lib/teamMembers.js";
 
 const blankClient = {
   agency: "",
@@ -36,6 +37,10 @@ export function ClientsPage({ data, reload, openNewProposal }) {
     const latest = proposals[0]?.status || "Draft";
     return { ...client, proposals: proposals.length, latest };
   });
+
+  // "Added by" only makes sense when there's more than one person in the account
+  // to distinguish between — mirrors the proposals table's "Sent by" column gating.
+  const showAddedBy = Boolean(data.teamMembers && Object.keys(data.teamMembers).length > 1);
 
   const q = query.toLowerCase().trim();
   const filtered = q
@@ -120,14 +125,19 @@ export function ClientsPage({ data, reload, openNewProposal }) {
               <th>GST</th>
               <th>Proposals</th>
               <th>Status</th>
+              {showAddedBy && <th>Added by</th>}
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
-              <tr><td colSpan={7} style={{ padding: "28px 16px", textAlign: "center", color: "#9ca3af" }}>No clients match "{query}"</td></tr>
+              <tr><td colSpan={showAddedBy ? 8 : 7} style={{ padding: "28px 16px", textAlign: "center", color: "#9ca3af" }}>No clients match "{query}"</td></tr>
             )}
-            {filtered.map((client) => (
+            {filtered.map((client) => {
+              const addedByName = showAddedBy
+                ? resolveCreatorName(client.createdByUserId, data.teamMembers, null)
+                : null;
+              return (
               <tr key={client.id}>
                 <td><strong>{client.agency}</strong></td>
                 <td>{client.contact}</td>
@@ -135,6 +145,17 @@ export function ClientsPage({ data, reload, openNewProposal }) {
                 <td className="muted">{client.gst}</td>
                 <td><strong>{client.proposals}</strong></td>
                 <td><span className="status-pill" style={getStatusStyle(client.latest)}>{client.latest}</span></td>
+                {showAddedBy && (
+                  <td className="muted">
+                    {addedByName ? (
+                      <span style={addedByName === "Deleted user" ? { color: "#9ca3af", fontStyle: "italic" } : {}}>
+                        {addedByName}
+                      </span>
+                    ) : (
+                      <span style={{ color: "#9ca3af" }}>—</span>
+                    )}
+                  </td>
+                )}
                 <td>
                   <div className="row-actions">
                     {perms.canWrite("proposals") && (
@@ -146,7 +167,8 @@ export function ClientsPage({ data, reload, openNewProposal }) {
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

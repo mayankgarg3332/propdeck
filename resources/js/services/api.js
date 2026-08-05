@@ -116,6 +116,11 @@ export const api = {
     request("/proposals/send-email", { method: "POST", body: JSON.stringify(payload) }),
   notifyPdfDownload: (payload) =>
     request("/proposals/pdf-notify", { method: "POST", body: JSON.stringify(payload) }),
+  notifyGmailOpen: (payload) =>
+    request("/proposals/gmail-notify", { method: "POST", body: JSON.stringify(payload) }),
+  notifyWhatsAppShare: (payload) =>
+    request("/proposals/whatsapp-notify", { method: "POST", body: JSON.stringify(payload) }),
+  getProposalEvents: (id) => request(`/proposals/${id}/events`),
   saveSettings: (settings) =>
     request("/settings", { method: "PUT", body: JSON.stringify(settings) }),
 };

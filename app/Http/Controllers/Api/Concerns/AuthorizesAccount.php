@@ -44,7 +44,7 @@ trait AuthorizesAccount
         $user = $this->currentUser($request);
         $query = Client::where('user_id', $this->accountUserId($request));
 
-        if (! $user->isAccountOwner()) {
+        if (! $user->isAdmin()) {
             $query->where('created_by_user_id', $user->id);
         }
 
@@ -61,7 +61,7 @@ trait AuthorizesAccount
         $user = $this->currentUser($request);
         $query = Proposal::where('user_id', $this->accountUserId($request));
 
-        if (! $user->isAccountOwner()) {
+        if (! $user->isAdmin()) {
             $query->where('created_by_user_id', $user->id);
         }
 

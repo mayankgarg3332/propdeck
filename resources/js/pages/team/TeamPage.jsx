@@ -20,6 +20,7 @@ const emptyForm = {
   email: "",
   password: "",
   password_confirmation: "",
+  is_admin: false,
   permissions: {
     clients: { read: true, write: false },
     proposals: { read: true, write: false },
@@ -206,6 +207,7 @@ export function TeamPage() {
       email: member.email,
       password: "",
       password_confirmation: "",
+      is_admin: Boolean(member.is_admin),
       permissions: { ...emptyForm.permissions, ...(member.permissions || {}) },
     });
     setModalError("");
@@ -238,6 +240,7 @@ export function TeamPage() {
         const payload = {
           name: form.name.trim(),
           email: form.email.trim(),
+          is_admin: form.is_admin,
           permissions: form.permissions,
         };
         if (form.password) {
@@ -318,6 +321,7 @@ export function TeamPage() {
               <thead>
                 <tr>
                   <th>Member</th>
+                  <th>Admin</th>
                   <th>Clients</th>
                   <th>Proposals</th>
                   <th>Products</th>
@@ -327,7 +331,7 @@ export function TeamPage() {
                   <th>Actions</th>
                 </tr>
                 <tr className="team-table-subhead">
-                  <th colSpan={4} />
+                  <th colSpan={5} />
                   <th>Sales</th>
                   <th>Payment</th>
                   <th>Email</th>
@@ -346,6 +350,13 @@ export function TeamPage() {
                           <div className="muted">{member.email}</div>
                         </div>
                       </div>
+                    </td>
+                    <td>
+                      {member.is_admin ? (
+                        <span className="perm-badge perm-badge-write">Admin</span>
+                      ) : (
+                        <span className="perm-badge perm-badge-none">—</span>
+                      )}
                     </td>
                     <td>
                       <PermBadge read={member.permissions?.clients?.read} write={member.permissions?.clients?.write} />
@@ -428,6 +439,22 @@ export function TeamPage() {
                   onChange={(value) => setForm({ ...form, password_confirmation: value })}
                 />
               </div>
+              <label className="team-admin-toggle">
+                <span className="perm-toggle">
+                  <input
+                    type="checkbox"
+                    checked={form.is_admin}
+                    onChange={(e) => setForm({ ...form, is_admin: e.target.checked })}
+                  />
+                  <span className="perm-toggle-ui" />
+                </span>
+                <span>
+                  <strong>Admin</strong>
+                  <span className="field-hint">
+                    Can view and manage every proposal and client in this account, not just their own.
+                  </span>
+                </span>
+              </label>
             </div>
 
             <PermissionMatrix

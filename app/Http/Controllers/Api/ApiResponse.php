@@ -6,19 +6,24 @@ use App\Models\AppSetting;
 use App\Models\Client;
 use App\Models\Product;
 use App\Models\Proposal;
+use App\Models\ProposalEvent;
 use App\Models\Rep;
 use App\Models\User;
 use App\Models\UserPermission;
 use App\Services\AccountMailer;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 trait ApiResponse
 {
     protected function clientPayload(Client $client): array
     {
-        return $client->only([
-            'id', 'agency', 'contact', 'email', 'phone', 'city', 'state', 'gst', 'notes',
-        ]);
+        return [
+            ...$client->only([
+                'id', 'agency', 'contact', 'email', 'phone', 'city', 'state', 'gst', 'notes',
+            ]),
+            'createdByUserId' => $client->created_by_user_id,
+        ];
     }
 
     protected function productPayload(Product $product): array
@@ -26,8 +31,13 @@ trait ApiResponse
         return $product->only(['id', 'name', 'category', 'color', 'description', 'plans']);
     }
 
-    protected function proposalPayload(Proposal $proposal): array
+    protected function proposalPayload(Proposal $proposal, ?Collection $eventRows = null): array
     {
+        $eventRows ??= ProposalEvent::where('proposal_id', $proposal->id)
+            ->select('type', DB::raw('count(*) as c'), DB::raw('max(created_at) as last_at'))
+            ->groupBy('type')
+            ->get();
+
         return [
             'id' => $proposal->id,
             'clientId' => $proposal->client_id,
@@ -49,7 +59,43 @@ trait ApiResponse
                 ?? $proposal->created_at?->toIso8601String(),
             'updatedAt' => $proposal->updated_at?->toIso8601String(),
             'createdByUserId' => $proposal->created_by_user_id,
+            'publicUrl' => $proposal->share_token
+                ? rtrim(config('app.url'), '/') . '/p/' . $proposal->share_token
+                : null,
+            'activity' => $this->activitySummaryFromRows($eventRows),
         ];
+    }
+
+    protected function activitySummaryFromRows(Collection $rows): array
+    {
+        $summary = [
+            'emailed' => ['count' => 0, 'lastAt' => null],
+            'gmailOpened' => ['count' => 0, 'lastAt' => null],
+            'pdfDownloaded' => ['count' => 0, 'lastAt' => null],
+            'whatsappShared' => ['count' => 0, 'lastAt' => null],
+            'linkViewed' => ['count' => 0, 'lastAt' => null],
+        ];
+
+        $keyMap = [
+            ProposalEvent::TYPE_EMAILED => 'emailed',
+            ProposalEvent::TYPE_GMAIL_OPENED => 'gmailOpened',
+            ProposalEvent::TYPE_PDF_DOWNLOADED => 'pdfDownloaded',
+            ProposalEvent::TYPE_WHATSAPP_SHARED => 'whatsappShared',
+            ProposalEvent::TYPE_PUBLIC_VIEWED => 'linkViewed',
+        ];
+
+        foreach ($rows as $row) {
+            $key = $keyMap[$row->type] ?? null;
+            if (! $key) {
+                continue;
+            }
+            $summary[$key] = [
+                'count' => (int) $row->c,
+                'lastAt' => $row->last_at ? \Illuminate\Support\Carbon::parse($row->last_at)->toIso8601String() : null,
+            ];
+        }
+
+        return $summary;
     }
 
     protected function settingsPayload(?AppSetting $settings): ?array
@@ -197,6 +243,7 @@ trait ApiResponse
             'name' => $user->name,
             'email' => $user->email,
             'isAccountOwner' => $user->isAccountOwner(),
+            'isAdmin' => $user->isAdmin(),
             'permissions' => $user->permissionsPayload(),
         ];
     }
@@ -207,6 +254,7 @@ trait ApiResponse
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'isAdmin' => $user->isAdmin(),
             'permissions' => $user->permissionsPayload(),
             'createdAt' => $user->created_at?->toIso8601String(),
         ];
@@ -219,7 +267,7 @@ trait ApiResponse
         $clients = collect();
         if ($user->canRead('clients')) {
             $q = Client::where('user_id', $accountId);
-            if (! $user->isAccountOwner()) {
+            if (! $user->isAdmin()) {
                 $q->where('created_by_user_id', $user->id);
             }
             $clients = $q->orderBy('agency')->get();
@@ -232,22 +280,30 @@ trait ApiResponse
         $proposals = collect();
         if ($user->canRead('proposals')) {
             $q = Proposal::where('user_id', $accountId);
-            if (! $user->isAccountOwner()) {
+            if (! $user->isAdmin()) {
                 $q->where('created_by_user_id', $user->id);
             }
             $proposals = $q->orderByDesc('date')->get();
         }
+
+        $activityByProposal = $proposals->isEmpty()
+            ? collect()
+            : ProposalEvent::whereIn('proposal_id', $proposals->pluck('id'))
+                ->select('proposal_id', 'type', DB::raw('count(*) as c'), DB::raw('max(created_at) as last_at'))
+                ->groupBy('proposal_id', 'type')
+                ->get()
+                ->groupBy('proposal_id');
 
         $accountSettings = AppSetting::findForAccount($accountId);
         $userSettings = AppSetting::findForUser($user->id);
         $settings = $this->mergeEffectiveSettings($accountSettings, $userSettings);
         $rep = Rep::where('user_id', $accountId)->first();
 
-        // Build teamMembers map (id → {name, email, signatory, phone}) for the account owner only.
+        // Build teamMembers map (id → {name, email, signatory, phone}) for the account owner and admins.
         // Includes the owner + all sub-users so proposals can show who created them,
         // and so the View/PDF modal can show the correct salesperson details per proposal.
         $teamMembers = null;
-        if ($user->isAccountOwner()) {
+        if ($user->isAdmin()) {
             $owner = User::find($accountId);
             $subUsers = User::where('parent_user_id', $accountId)->get();
             $accountSettingsForTeam = AppSetting::findForAccount($accountId);
@@ -273,7 +329,7 @@ trait ApiResponse
         return [
             'clients' => $clients->map(fn ($c) => $this->clientPayload($c))->values(),
             'products' => $products->map(fn ($p) => $this->productPayload($p))->values(),
-            'proposals' => $proposals->map(fn ($p) => $this->proposalPayload($p))->values(),
+            'proposals' => $proposals->map(fn ($p) => $this->proposalPayload($p, $activityByProposal->get($p->id, collect())))->values(),
             'settings' => $this->filteredSettingsPayload($settings, $user),
             'rep' => $rep?->only(['id', 'name', 'email', 'phone', 'role']),
             'nextProposalId' => $this->nextProposalId($accountId, $settings),

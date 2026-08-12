@@ -114,8 +114,8 @@ export function downloadProposalPdf({ proposal, client, settings, rep, creatorSe
   const proposalDate = proposal.date ? new Date(proposal.date + "T00:00:00") : new Date();
   const validTill = new Date(proposalDate);
   validTill.setDate(validTill.getDate() + validityDays);
-  const dateStr = formatDate(proposalDate.toISOString().split("T")[0]);
-  const validTillStr = formatDate(validTill.toISOString().split("T")[0]);
+  const dateStr = formatDate(proposal.date || proposalDate);
+  const validTillStr = formatDate(`${validTill.getFullYear()}-${String(validTill.getMonth() + 1).padStart(2, "0")}-${String(validTill.getDate()).padStart(2, "0")}`);
   // If a creatorSettings object is provided (master viewing sub-user's proposal),
   // use the creator's signatory/phone; otherwise fall back to logged-in user's settings.
   const signatory = creatorSettings?.signatory || company.signatory || rep?.name || "Sales Team";
